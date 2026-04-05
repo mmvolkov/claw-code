@@ -1,221 +1,221 @@
-# TUI Enhancement Plan — Claw Code (`rusty-claude-cli`)
+# План улучшения TUI — Claw Code (`rusty-claude-cli`)
 
-## Executive Summary
+## Краткое резюме
 
-This plan covers a comprehensive analysis of the current terminal user interface and proposes phased enhancements that will transform the existing REPL/prompt CLI into a polished, modern TUI experience — while preserving the existing clean architecture and test coverage.
+Этот план содержит полный анализ текущего терминального интерфейса и предлагает поэтапные улучшения, которые превратят существующий REPL/prompt CLI в аккуратный современный TUI, не ломая текущую чистую архитектуру и тестовое покрытие.
 
 ---
 
-## 1. Current Architecture Analysis
+## 1. Анализ текущей архитектуры
 
-### Crate Map
+### Карта crate’ов
 
-| Crate | Purpose | Lines | TUI Relevance |
+| Crate | Назначение | Строк | Значимость для TUI |
 |---|---|---|---|
-| `rusty-claude-cli` | Main binary: REPL loop, arg parsing, rendering, API bridge | ~3,600 | **Primary TUI surface** |
-| `runtime` | Session, conversation loop, config, permissions, compaction | ~5,300 | Provides data/state |
-| `api` | Anthropic HTTP client + SSE streaming | ~1,500 | Provides stream events |
-| `commands` | Slash command metadata/parsing/help | ~470 | Drives command dispatch |
-| `tools` | 18 built-in tool implementations | ~3,500 | Tool execution display |
+| `rusty-claude-cli` | Основной бинарник: REPL-loop, парсинг аргументов, рендеринг, API bridge | ~3,600 | **Основная TUI-поверхность** |
+| `runtime` | Сессии, conversation loop, config, права, compaction | ~5,300 | Источник данных и состояния |
+| `api` | Anthropic HTTP client + SSE streaming | ~1,500 | Поставляет stream-события |
+| `commands` | Метаданные / парсинг / help для slash-команд | ~470 | Управляет dispatch команд |
+| `tools` | 18 встроенных реализаций инструментов | ~3,500 | Показывает выполнение инструментов |
 
-### Current TUI Components
+### Текущие компоненты TUI
 
-| Component | File | What It Does Today | Quality |
+| Компонент | Файл | Что делает сейчас | Качество |
 |---|---|---|---|
-| **Input** | `input.rs` (269 lines) | `rustyline`-based line editor with slash-command tab completion, Shift+Enter newline, history | ✅ Solid |
-| **Rendering** | `render.rs` (641 lines) | Markdown→terminal rendering (headings, lists, tables, code blocks with syntect highlighting, blockquotes), spinner widget | ✅ Good |
-| **App/REPL loop** | `main.rs` (3,159 lines) | The monolithic `LiveCli` struct: REPL loop, all slash command handlers, streaming output, tool call display, permission prompting, session management | ⚠️ Monolithic |
-| **Alt App** | `app.rs` (398 lines) | An earlier `CliApp` prototype with `ConversationClient`, stream event handling, `TerminalRenderer`, output format support | ⚠️ Appears unused/legacy |
+| **Ввод** | `input.rs` (269 строк) | `rustyline`-редактор с tab completion для slash-команд, Shift+Enter newline, history | ✅ Надежно |
+| **Рендеринг** | `render.rs` (641 строка) | Рендер Markdown→terminal (заголовки, списки, таблицы, code block с подсветкой через `syntect`, blockquote), spinner-widget | ✅ Хорошо |
+| **App/REPL loop** | `main.rs` (3,159 строк) | Монолитная структура `LiveCli`: REPL loop, все handler’ы slash-команд, streaming output, показ tool call, permission prompt, session management | ⚠️ Монолит |
+| **Альтернативное приложение** | `app.rs` (398 строк) | Ранний прототип `CliApp` с `ConversationClient`, обработкой stream-событий, `TerminalRenderer`, поддержкой output format | ⚠️ Похоже на legacy |
 
-### Key Dependencies
+### Ключевые зависимости
 
-- **crossterm 0.28** — terminal control (cursor, colors, clear)
-- **pulldown-cmark 0.13** — Markdown parsing
-- **syntect 5** — syntax highlighting
-- **rustyline 15** — line editing with completion
-- **serde_json** — tool I/O formatting
+- **crossterm 0.28** — управление терминалом (курсор, цвета, очистка)
+- **pulldown-cmark 0.13** — парсинг Markdown
+- **syntect 5** — синтаксическая подсветка
+- **rustyline 15** — редактирование строк с completion
+- **serde_json** — форматирование tool I/O
 
-### Strengths
+### Сильные стороны
 
-1. **Clean rendering pipeline**: Markdown rendering is well-structured with state tracking, table rendering, code highlighting
-2. **Rich tool display**: Tool calls get box-drawing borders (`╭─ name ─╮`), results show ✓/✗ icons
-3. **Comprehensive slash commands**: 15 commands covering model switching, permissions, sessions, config, diff, export
-4. **Session management**: Full persistence, resume, list, switch, compaction
-5. **Permission prompting**: Interactive Y/N approval for restricted tool calls
-6. **Thorough tests**: Every formatting function, every parse path has unit tests
+1. **Чистый pipeline рендеринга**: рендер Markdown организован хорошо, со state tracking, рендерингом таблиц и подсветкой кода
+2. **Богатое отображение инструментов**: tool call получают рамки box-drawing (`╭─ name ─╮`), результаты показывают иконки ✓/✗
+3. **Богатый набор slash-команд**: 15 команд для переключения модели, прав, сессий, config, diff, export
+4. **Управление сессиями**: полное сохранение, resume, list, switch, compaction
+5. **Permission prompting**: интерактивное подтверждение Y/N для restricted tool call
+6. **Хорошее тестовое покрытие**: у функций форматирования и путей парсинга есть unit-тесты
 
-### Weaknesses & Gaps
+### Слабые места и разрывы
 
-1. **`main.rs` is a 3,159-line monolith** — all REPL logic, formatting, API bridging, session management, and tests in one file
-2. **No alternate-screen / full-screen layout** — everything is inline scrolling output
-3. **No progress bars** — only a single braille spinner; no indication of streaming progress or token counts during generation
-4. **No visual diff rendering** — `/diff` just dumps raw git diff text
-5. **No syntax highlighting in streamed output** — markdown rendering only applies to tool results, not to the main assistant response stream
-6. **No status bar / HUD** — model, tokens, session info not visible during interaction
-7. **No image/attachment preview** — `SendUserMessage` resolves attachments but never displays them
-8. **Streaming is char-by-char with artificial delay** — `stream_markdown` sleeps 8ms per whitespace-delimited chunk
-9. **No color theme customization** — hardcoded `ColorTheme::default()`
-10. **No resize handling** — no terminal size awareness for wrapping, truncation, or layout
-11. **Dual app structs** — `app.rs` has a separate `CliApp` that duplicates `LiveCli` from `main.rs`
-12. **No pager for long outputs** — `/status`, `/config`, `/memory` can overflow the viewport
-13. **Tool results not collapsible** — large bash outputs flood the screen
-14. **No thinking/reasoning indicator** — when the model is in "thinking" mode, no visual distinction
-15. **No auto-complete for tool arguments** — only slash command names complete
-
----
-
-## 2. Enhancement Plan
-
-### Phase 0: Structural Cleanup (Foundation)
-
-**Goal**: Break the monolith, remove dead code, establish the module structure for TUI work.
-
-| Task | Description | Effort |
-|---|---|---|
-| 0.1 | **Extract `LiveCli` into `app.rs`** — Move the entire `LiveCli` struct, its impl, and helpers (`format_*`, `render_*`, session management) out of `main.rs` into focused modules: `app.rs` (core), `format.rs` (report formatting), `session_manager.rs` (session CRUD) | M |
-| 0.2 | **Remove or merge the legacy `CliApp`** — The existing `app.rs` has an unused `CliApp` with its own `ConversationClient`-based rendering. Either delete it or merge its unique features (stream event handler pattern) into the active `LiveCli` | S |
-| 0.3 | **Extract `main.rs` arg parsing** — The current `parse_args()` is a hand-rolled parser that duplicates the clap-based `args.rs`. Consolidate on the hand-rolled parser (it's more feature-complete) and move it to `args.rs`, or adopt clap fully | S |
-| 0.4 | **Create a `tui/` module** — Introduce `crates/rusty-claude-cli/src/tui/mod.rs` as the namespace for all new TUI components: `status_bar.rs`, `layout.rs`, `tool_panel.rs`, etc. | S |
-
-### Phase 1: Status Bar & Live HUD
-
-**Goal**: Persistent information display during interaction.
-
-| Task | Description | Effort |
-|---|---|---|
-| 1.1 | **Terminal-size-aware status line** — Use `crossterm::terminal::size()` to render a bottom-pinned status bar showing: model name, permission mode, session ID, cumulative token count, estimated cost | M |
-| 1.2 | **Live token counter** — Update the status bar in real-time as `AssistantEvent::Usage` and `AssistantEvent::TextDelta` events arrive during streaming | M |
-| 1.3 | **Turn duration timer** — Show elapsed time for the current turn (the `showTurnDuration` config already exists in Config tool but isn't wired up) | S |
-| 1.4 | **Git branch indicator** — Display the current git branch in the status bar (already parsed via `parse_git_status_metadata`) | S |
-
-### Phase 2: Enhanced Streaming Output
-
-**Goal**: Make the main response stream visually rich and responsive.
-
-| Task | Description | Effort |
-|---|---|---|
-| 2.1 | **Live markdown rendering** — Instead of raw text streaming, buffer text deltas and incrementally render Markdown as it arrives (heading detection, bold/italic, inline code). The existing `TerminalRenderer::render_markdown` can be adapted for incremental use | L |
-| 2.2 | **Thinking indicator** — When extended thinking/reasoning is active, show a distinct animated indicator (e.g., `🧠 Reasoning...` with pulsing dots or a different spinner) instead of the generic `🦀 Thinking...` | S |
-| 2.3 | **Streaming progress bar** — Add an optional horizontal progress indicator below the spinner showing approximate completion (based on max_tokens vs. output_tokens so far) | M |
-| 2.4 | **Remove artificial stream delay** — The current `stream_markdown` sleeps 8ms per chunk. For tool results this is fine, but for the main response stream it should be immediate or configurable | S |
-
-### Phase 3: Tool Call Visualization
-
-**Goal**: Make tool execution legible and navigable.
-
-| Task | Description | Effort |
-|---|---|---|
-| 3.1 | **Collapsible tool output** — For tool results longer than N lines (configurable, default 15), show a summary with `[+] Expand` hint; pressing a key reveals the full output. Initially implement as truncation with a "full output saved to file" fallback | M |
-| 3.2 | **Syntax-highlighted tool results** — When tool results contain code (detected by tool name — `bash` stdout, `read_file` content, `REPL` output), apply syntect highlighting rather than rendering as plain text | M |
-| 3.3 | **Tool call timeline** — For multi-tool turns, show a compact summary: `🔧 bash → ✓ | read_file → ✓ | edit_file → ✓ (3 tools, 1.2s)` after all tool calls complete | S |
-| 3.4 | **Diff-aware edit_file display** — When `edit_file` succeeds, show a colored unified diff of the change instead of just `✓ edit_file: path` | M |
-| 3.5 | **Permission prompt enhancement** — Style the approval prompt with box drawing, color the tool name, show a one-line summary of what the tool will do | S |
-
-### Phase 4: Enhanced Slash Commands & Navigation
-
-**Goal**: Improve information display and add missing features.
-
-| Task | Description | Effort |
-|---|---|---|
-| 4.1 | **Colored `/diff` output** — Parse the git diff and render it with red/green coloring for removals/additions, similar to `delta` or `diff-so-fancy` | M |
-| 4.2 | **Pager for long outputs** — When `/status`, `/config`, `/memory`, or `/diff` produce output longer than the terminal height, pipe through an internal pager (scroll with j/k/q) or external `$PAGER` | M |
-| 4.3 | **`/search` command** — Add a new command to search conversation history by keyword | M |
-| 4.4 | **`/undo` command** — Undo the last file edit by restoring from the `originalFile` data in `write_file`/`edit_file` tool results | M |
-| 4.5 | **Interactive session picker** — Replace the text-based `/session list` with an interactive fuzzy-filterable list (up/down arrows to select, enter to switch) | L |
-| 4.6 | **Tab completion for tool arguments** — Extend `SlashCommandHelper` to complete file paths after `/export`, model names after `/model`, session IDs after `/session switch` | M |
-
-### Phase 5: Color Themes & Configuration
-
-**Goal**: User-customizable visual appearance.
-
-| Task | Description | Effort |
-|---|---|---|
-| 5.1 | **Named color themes** — Add `dark` (current default), `light`, `solarized`, `catppuccin` themes. Wire to the existing `Config` tool's `theme` setting | M |
-| 5.2 | **ANSI-256 / truecolor detection** — Detect terminal capabilities and fall back gracefully (no colors → 16 colors → 256 → truecolor) | M |
-| 5.3 | **Configurable spinner style** — Allow choosing between braille dots, bar, moon phases, etc. | S |
-| 5.4 | **Banner customization** — Make the ASCII art banner optional or configurable via settings | S |
-
-### Phase 6: Full-Screen TUI Mode (Stretch)
-
-**Goal**: Optional alternate-screen layout for power users.
-
-| Task | Description | Effort |
-|---|---|---|
-| 6.1 | **Add `ratatui` dependency** — Introduce `ratatui` (terminal UI framework) as an optional dependency for the full-screen mode | S |
-| 6.2 | **Split-pane layout** — Top pane: conversation with scrollback; Bottom pane: input area; Right sidebar (optional): tool status/todo list | XL |
-| 6.3 | **Scrollable conversation view** — Navigate past messages with PgUp/PgDn, search within conversation | L |
-| 6.4 | **Keyboard shortcuts panel** — Show `?` help overlay with all keybindings | M |
-| 6.5 | **Mouse support** — Click to expand tool results, scroll conversation, select text for copy | L |
+1. **`main.rs` — монолит на 3,159 строк**: вся логика REPL, форматирование, API bridge, session management и тесты находятся в одном файле
+2. **Нет alternate-screen / full-screen layout**: всё выводится в линейный скролл
+3. **Нет progress bar**: только один braille-spinner, без индикации прогресса streaming или token count во время генерации
+4. **Нет визуального рендеринга diff**: `/diff` просто печатает сырой `git diff`
+5. **Нет синтаксической подсветки в streamed output**: Markdown-рендер применяется только к tool results, а не к основному stream ответа ассистента
+6. **Нет status bar / HUD**: модель, токены, session info не видны во время работы
+7. **Нет preview для изображений/вложений**: `SendUserMessage` разбирает attachments, но никогда не показывает их
+8. **Streaming идет посимвольно с искусственной задержкой**: `stream_markdown` делает sleep 8 мс на каждый whitespace-delimited chunk
+9. **Нет настройки цветовой темы**: жестко зашит `ColorTheme::default()`
+10. **Нет обработки resize**: нет осознания размера терминала для переноса, обрезки и layout
+11. **Две структуры app**: `app.rs` содержит отдельный `CliApp`, который дублирует `LiveCli` из `main.rs`
+12. **Нет pager’а для длинного вывода**: `/status`, `/config`, `/memory` могут переполнять viewport
+13. **Результаты инструментов нельзя сворачивать**: большие выводы `bash` захламляют экран
+14. **Нет индикатора thinking/reasoning**: когда модель находится в режиме «thinking», это не отличается визуально
+15. **Нет auto-complete для аргументов инструментов**: дополняются только имена slash-команд
 
 ---
 
-## 3. Priority Recommendation
+## 2. План улучшений
 
-### Immediate (High Impact, Moderate Effort)
+### Фаза 0: структурная очистка (foundation)
 
-1. **Phase 0** — Essential cleanup. The 3,159-line `main.rs` is the #1 maintenance risk and blocks clean TUI additions.
-2. **Phase 1.1–1.2** — Status bar with live tokens. Highest-impact UX win: users constantly want to know token usage.
-3. **Phase 2.4** — Remove artificial delay. Low effort, immediately noticeable improvement.
-4. **Phase 3.1** — Collapsible tool output. Large bash outputs currently wreck readability.
+**Цель**: разбить монолит, удалить dead code и подготовить модульную структуру для TUI-работ.
 
-### Near-Term (Next Sprint)
+| Задача | Описание | Оценка |
+|---|---|---|
+| 0.1 | **Вынести `LiveCli` в `app.rs`** — перенести саму структуру `LiveCli`, ее `impl` и helper’ы (`format_*`, `render_*`, session management) из `main.rs` в более узкие модули: `app.rs` (ядро), `format.rs` (форматирование отчетов), `session_manager.rs` (CRUD для сессий) | M |
+| 0.2 | **Удалить или слить legacy `CliApp`** — существующий `app.rs` содержит неиспользуемый `CliApp` со своим `ConversationClient`-рендерингом. Его нужно либо удалить, либо перенести уникальные части (паттерн обработки stream events) в активный `LiveCli` | S |
+| 0.3 | **Вынести из `main.rs` парсинг аргументов** — текущий `parse_args()` написан вручную и дублирует clap-based `args.rs`. Нужно либо окончательно остаться на hand-rolled parser (он функционально богаче), либо полностью перейти на clap | S |
+| 0.4 | **Создать модуль `tui/`** — ввести `crates/rusty-claude-cli/src/tui/mod.rs` как namespace для новых TUI-компонентов: `status_bar.rs`, `layout.rs`, `tool_panel.rs` и т.д. | S |
 
-5. **Phase 2.1** — Live markdown rendering. Makes the core interaction feel polished.
-6. **Phase 3.2** — Syntax-highlighted tool results.
-7. **Phase 3.4** — Diff-aware edit display.
-8. **Phase 4.1** — Colored diff for `/diff`.
+### Фаза 1: status bar и live HUD
 
-### Longer-Term
+**Цель**: постоянный вывод ключевой информации во время работы.
 
-9. **Phase 5** — Color themes (user demand-driven).
-10. **Phase 4.2–4.6** — Enhanced navigation and commands.
-11. **Phase 6** — Full-screen mode (major undertaking, evaluate after earlier phases ship).
+| Задача | Описание | Оценка |
+|---|---|---|
+| 1.1 | **Status line с учетом размера терминала** — использовать `crossterm::terminal::size()` для рендера нижней status bar с моделью, режимом прав, session ID, суммарным числом токенов и оценкой стоимости | M |
+| 1.2 | **Live-счетчик токенов** — обновлять status bar в реальном времени по мере прихода `AssistantEvent::Usage` и `AssistantEvent::TextDelta` во время streaming | M |
+| 1.3 | **Таймер длительности turn** — показывать elapsed time текущего turn; config `showTurnDuration` уже есть в `Config` tool, но еще не подключен | S |
+| 1.4 | **Индикатор git-ветки** — показывать текущую git-ветку в status bar (она уже парсится через `parse_git_status_metadata`) | S |
+
+### Фаза 2: улучшенный streamed output
+
+**Цель**: сделать основной stream ответа визуально богаче и отзывчивее.
+
+| Задача | Описание | Оценка |
+|---|---|---|
+| 2.1 | **Live-рендеринг Markdown** — вместо сырого text-stream буферизовать text delta и инкрементально рендерить Markdown по мере поступления (заголовки, bold/italic, inline code). Существующий `TerminalRenderer::render_markdown` можно адаптировать для incremental use | L |
+| 2.2 | **Индикатор thinking** — когда включен extended thinking/reasoning, показывать отдельный анимированный индикатор, например `🧠 Reasoning...`, а не общий `🦀 Thinking...` | S |
+| 2.3 | **Progress bar для streaming** — добавить опциональный горизонтальный индикатор под spinner, который показывает приблизительное завершение (на основе `max_tokens` и текущего числа выходных токенов) | M |
+| 2.4 | **Убрать искусственную задержку stream** — текущий `stream_markdown` делает `sleep` 8 мс на chunk. Для tool results это приемлемо, но для основного stream ответа он должен быть мгновенным или конфигурируемым | S |
+
+### Фаза 3: визуализация tool call
+
+**Цель**: сделать выполнение инструментов читабельным и навигируемым.
+
+| Задача | Описание | Оценка |
+|---|---|---|
+| 3.1 | **Сворачиваемый вывод инструментов** — для tool result длиннее N строк (настраиваемо, по умолчанию 15) показывать summary с подсказкой `[+] Expand`; по нажатию клавиши раскрывать полный вывод. На первом этапе можно ограничиться truncation + fallback «полный вывод сохранен в файл» | M |
+| 3.2 | **Подсветка кода в tool results** — если в результате есть код (определяется по имени инструмента — `bash` stdout, содержимое `read_file`, вывод `REPL`), применять `syntect`, а не обычный plaintext | M |
+| 3.3 | **Timeline tool call** — для multi-tool turn показывать компактную сводку вида `🔧 bash → ✓ | read_file → ✓ | edit_file → ✓ (3 tools, 1.2s)` после завершения всех вызовов инструментов | S |
+| 3.4 | **Diff-aware отображение `edit_file`** — при успешном `edit_file` показывать цветной unified diff, а не просто `✓ edit_file: path` | M |
+| 3.5 | **Улучшение permission prompt** — оформить prompt в box-drawing стиле, выделить цветом имя инструмента и показать однострочное summary действия | S |
+
+### Фаза 4: улучшенные slash-команды и навигация
+
+**Цель**: улучшить отображение информации и добавить недостающие возможности.
+
+| Задача | Описание | Оценка |
+|---|---|---|
+| 4.1 | **Цветной вывод `/diff`** — парсить git diff и рендерить добавления/удаления с красно-зеленой раскраской, как в `delta` или `diff-so-fancy` | M |
+| 4.2 | **Pager для длинного вывода** — если `/status`, `/config`, `/memory` или `/diff` выводят больше, чем высота терминала, пропускать вывод через внутренний pager (скролл j/k/q) или внешний `$PAGER` | M |
+| 4.3 | **Команда `/search`** — добавить поиск по истории диалога по ключевому слову | M |
+| 4.4 | **Команда `/undo`** — откатывать последнее редактирование файла, используя `originalFile` из результатов `write_file` / `edit_file` | M |
+| 4.5 | **Интерактивный session picker** — заменить текстовый `/session list` на интерактивный список с fuzzy-filter, стрелками вверх/вниз и Enter для переключения | L |
+| 4.6 | **Tab completion для аргументов инструментов** — расширить `SlashCommandHelper`, чтобы он дополнял пути после `/export`, имена моделей после `/model`, session ID после `/session switch` | M |
+
+### Фаза 5: цветовые темы и конфигурация
+
+**Цель**: настраиваемый визуальный вид.
+
+| Задача | Описание | Оценка |
+|---|---|---|
+| 5.1 | **Именованные цветовые темы** — добавить темы `dark` (текущая), `light`, `solarized`, `catppuccin`. Подключить к существующему `theme` в `Config` tool | M |
+| 5.2 | **Определение ANSI-256 / truecolor** — определять возможности терминала и корректно деградировать (`no colors` → `16 colors` → `256` → `truecolor`) | M |
+| 5.3 | **Настраиваемый spinner** — позволить выбирать стиль spinner: braille dots, bar, moon phases и т.д. | S |
+| 5.4 | **Настройка banner** — сделать ASCII-art banner опциональным или конфигурируемым через settings | S |
+
+### Фаза 6: полноэкранный TUI-режим (stretch)
+
+**Цель**: опциональный alternate-screen layout для power user’ов.
+
+| Задача | Описание | Оценка |
+|---|---|---|
+| 6.1 | **Добавить зависимость `ratatui`** — ввести `ratatui` как опциональную зависимость для полноэкранного режима | S |
+| 6.2 | **Split-pane layout** — верхняя панель: диалог со scrollback; нижняя панель: поле ввода; правая sidebar (опционально): статус инструментов / список todo | XL |
+| 6.3 | **Прокручиваемый conversation view** — навигация по прошлым сообщениям через PgUp/PgDn, поиск внутри диалога | L |
+| 6.4 | **Панель keyboard shortcuts** — overlay по `?`, показывающий все keybinding’и | M |
+| 6.5 | **Поддержка мыши** — клик для раскрытия tool result, прокрутка диалога, выделение текста для копирования | L |
 
 ---
 
-## 4. Architecture Recommendations
+## 3. Рекомендуемый приоритет
 
-### Module Structure After Phase 0
+### Немедленно (высокая ценность, умеренная стоимость)
+
+1. **Фаза 0** — обязательная уборка. `main.rs` на 3,159 строк — главный риск для поддержки и главное препятствие для чистого развития TUI.
+2. **Фаза 1.1–1.2** — status bar с live token counter. Это наибольший прирост UX: пользователям постоянно нужно видеть token usage.
+3. **Фаза 2.4** — убрать искусственную задержку. Небольшая работа, но заметный эффект сразу.
+4. **Фаза 3.1** — сворачиваемый вывод инструментов. Большие выводы `bash` сейчас разрушают читаемость.
+
+### Ближайший спринт
+
+5. **Фаза 2.1** — live-рендеринг Markdown. Делает основное взаимодействие ощутимо более polished.
+6. **Фаза 3.2** — подсветка кода в tool result.
+7. **Фаза 3.4** — diff-aware display для edit.
+8. **Фаза 4.1** — цветной `/diff`.
+
+### Более длинный горизонт
+
+9. **Фаза 5** — цветовые темы (если будет спрос со стороны пользователей).
+10. **Фаза 4.2–4.6** — улучшенная навигация и новые команды.
+11. **Фаза 6** — полноэкранный режим (большая задача, лучше оценивать после поставки ранних фаз).
+
+---
+
+## 4. Архитектурные рекомендации
+
+### Структура модулей после Фазы 0
 
 ```
 crates/rusty-claude-cli/src/
-├── main.rs              # Entrypoint, arg dispatch only (~100 lines)
-├── args.rs              # CLI argument parsing (consolidate existing two parsers)
-├── app.rs               # LiveCli struct, REPL loop, turn execution
-├── format.rs            # All report formatting (status, cost, model, permissions, etc.)
-├── session_mgr.rs       # Session CRUD: create, resume, list, switch, persist
-├── init.rs              # Repo initialization (unchanged)
-├── input.rs             # Line editor (unchanged, minor extensions)
-├── render.rs            # TerminalRenderer, Spinner (extended)
+├── main.rs              # Entrypoint, только dispatch аргументов (~100 строк)
+├── args.rs              # Парсинг CLI-аргументов (нужно свести существующие два парсера в один)
+├── app.rs               # Структура LiveCli, REPL loop, выполнение turn
+├── format.rs            # Все форматирование отчетов (status, cost, model, permissions и т.д.)
+├── session_mgr.rs       # CRUD для сессий: create, resume, list, switch, persist
+├── init.rs              # Инициализация репозитория (без изменений)
+├── input.rs             # Редактор строк (без изменений, только мелкие расширения)
+├── render.rs            # TerminalRenderer, Spinner (с расширениями)
 └── tui/
-    ├── mod.rs           # TUI module root
-    ├── status_bar.rs    # Persistent bottom status line
-    ├── tool_panel.rs    # Tool call visualization (boxes, timelines, collapsible)
-    ├── diff_view.rs     # Colored diff rendering
-    ├── pager.rs         # Internal pager for long outputs
-    └── theme.rs         # Color theme definitions and selection
+    ├── mod.rs           # Корень TUI-модуля
+    ├── status_bar.rs    # Постоянная нижняя строка статуса
+    ├── tool_panel.rs    # Визуализация tool call (рамки, timeline, collapse)
+    ├── diff_view.rs     # Цветной рендеринг diff
+    ├── pager.rs         # Внутренний pager для длинного вывода
+    └── theme.rs         # Определение и выбор цветовых тем
 ```
 
-### Key Design Principles
+### Ключевые принципы проектирования
 
-1. **Keep the inline REPL as the default** — Full-screen TUI should be opt-in (`--tui` flag)
-2. **Everything testable without a terminal** — All formatting functions take `&mut impl Write`, never assume stdout directly
-3. **Streaming-first** — Rendering should work incrementally, not buffering the entire response
-4. **Respect `crossterm` for all terminal control** — Don't mix raw ANSI escape codes with crossterm (the current codebase does this in the startup banner)
-5. **Feature-gate heavy dependencies** — `ratatui` should be behind a `full-tui` feature flag
+1. **Оставить inline REPL режимом по умолчанию** — полноэкранный TUI должен быть opt-in через `--tui`
+2. **Все тестируемо без терминала** — все функции форматирования должны принимать `&mut impl Write` и не зависеть напрямую от `stdout`
+3. **Streaming-first** — рендеринг должен работать инкрементально, а не после буферизации всего ответа
+4. **Полагаться на `crossterm` для управления терминалом** — не смешивать raw ANSI escape code и `crossterm` (сейчас кодовая база делает это в startup banner)
+5. **Feature-gate для тяжелых зависимостей** — `ratatui` должен быть за флагом `full-tui`
 
 ---
 
-## 5. Risk Assessment
+## 5. Оценка рисков
 
-| Risk | Mitigation |
+| Риск | Смягчение |
 |---|---|
-| Breaking the working REPL during refactor | Phase 0 is pure restructuring with existing test coverage as safety net |
-| Terminal compatibility issues (tmux, SSH, Windows) | Rely on crossterm's abstraction; test in degraded environments |
-| Performance regression with rich rendering | Profile before/after; keep the fast path (raw streaming) always available |
-| Scope creep into Phase 6 | Ship Phases 0–3 as a coherent release before starting Phase 6 |
-| `app.rs` vs `main.rs` confusion | Phase 0.2 explicitly resolves this by removing the legacy `CliApp` |
+| Поломка рабочего REPL во время рефакторинга | Фаза 0 должна быть чистой реструктуризацией, а существующие тесты служат страховкой |
+| Проблемы совместимости терминалов (tmux, SSH, Windows) | Использовать абстракции `crossterm`; тестировать и в деградированных окружениях |
+| Просадка производительности из-за богатого рендеринга | Профилировать до/после; всегда оставлять быстрый путь с raw-streaming |
+| Разрастание scope в Фазе 6 | Сначала выпустить Фазы 0–3 как цельный релиз, только потом браться за Фазу 6 |
+| Путаница между `app.rs` и `main.rs` | Фаза 0.2 явно устраняет это, убирая legacy `CliApp` |
 
 ---
 
-*Generated: 2026-03-31 | Workspace: `rust/` | Branch: `dev/rust`*
+*Сгенерировано: 2026-03-31 | Workspace: `rust/` | Ветка: `dev/rust`*

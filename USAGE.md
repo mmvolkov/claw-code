@@ -1,38 +1,38 @@
-# Claw Code Usage
+# Использование Claw Code
 
-This guide covers the current Rust workspace under `rust/` and the `claw` CLI binary.
+Это руководство описывает текущий Rust workspace в `rust/` и CLI-бинарник `claw`.
 
-For the full runbook, use [docs/SETUP_AND_OPERATIONS.md](/Users/michaelvolkov/projects/claw-code/docs/SETUP_AND_OPERATIONS.md). This file stays focused on quick-start commands.
+Полный runbook находится в [docs/SETUP_AND_OPERATIONS.md](./docs/SETUP_AND_OPERATIONS.md). Этот файл остается концентрированным quick-start руководством.
 
-## Prerequisites
+## Предварительные требования
 
-- Rust toolchain with `cargo`
-- One of:
-  - `ANTHROPIC_API_KEY` for direct API access
-  - `claw login` for OAuth-based auth
-- Optional: `ANTHROPIC_BASE_URL` when targeting a proxy or local service
+- инструментарий Rust с `cargo`
+- Один из вариантов:
+  - `ANTHROPIC_API_KEY` для прямого доступа к API
+  - `claw login` для OAuth-аутентификации
+- Опционально: `ANTHROPIC_BASE_URL`, если вы работаете через прокси или локальный сервис
 
-## Build the workspace
+## Сборка workspace
 
 ```bash
 cd rust
 cargo build --workspace
 ```
 
-The CLI binary is available at `rust/target/debug/claw` after a debug build.
+После debug-сборки CLI-бинарник будет доступен по пути `rust/target/debug/claw`.
 
-## Run with Docker
+## Запуск через Docker
 
-The repository now includes a top-level `Dockerfile` for running `claw` in a containerized dev environment.
+В репозитории есть верхнеуровневый `Dockerfile`, позволяющий запускать `claw` в контейнеризированной dev-среде.
 
-Build the image from the repository root:
+Соберите образ из корня репозитория:
 
 ```bash
 cd /Users/michaelvolkov/projects/claw-code
 docker build -t claw-code .
 ```
 
-Run the CLI interactively against the current repository mounted at `/workspace`:
+Запустите CLI в интерактивном режиме, смонтировав текущий репозиторий в `/workspace`:
 
 ```bash
 cd /Users/michaelvolkov/projects/claw-code
@@ -45,7 +45,7 @@ docker run --rm -it \
   claw-code
 ```
 
-Run a one-shot prompt:
+Одноразовый prompt:
 
 ```bash
 cd /Users/michaelvolkov/projects/claw-code
@@ -58,13 +58,13 @@ docker run --rm -it \
   claw-code prompt "summarize this repository"
 ```
 
-The image keeps the Rust toolchain, `git`, `python3`, and `rg` installed so the container can be used as a practical `claw` workspace rather than a binary-only wrapper.
+Внутри образа остаются Rust toolchain, `git`, `python3` и `rg`, поэтому контейнер подходит не только как обертка над бинарником, но и как практическое рабочее окружение для `claw`.
 
-### Run the web interface
+### Запуск web-интерфейса
 
-The Rust workspace also includes a browser UI served by the new `claw-web` binary.
+Rust workspace также включает браузерный UI, который обслуживается новым бинарником `claw-web`.
 
-Run it from the repository root:
+Запуск из корня репозитория:
 
 ```bash
 cd /Users/michaelvolkov/projects/claw-code
@@ -80,53 +80,53 @@ docker run --rm -it \
   --cwd /workspace
 ```
 
-Then open `http://localhost:8787` in the browser.
+После этого откройте `http://localhost:8787` в браузере.
 
-The web interface streams assistant deltas, tool activity, usage updates, and final turn completion over the `/api/chat/stream` SSE endpoint.
+Web-интерфейс стримит дельты ответа ассистента, активность инструментов, обновления usage и финальное завершение turn через SSE endpoint `/api/chat/stream`.
 
-If you want to use browser-based Claude OAuth from the web UI, do not pass `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` into the container, because environment credentials override saved OAuth tokens.
-Claw Web now completes OAuth through the same loopback callback as `claw login`: `http://localhost:4545/callback`.
-When running in Docker, the callback port must be published with `-p 4545:4545`, otherwise the browser cannot deliver the OAuth redirect back into the container.
-Saved Claude OAuth credentials are persisted correctly, but this runtime still sends direct requests to the Anthropic Messages API by default. For direct inference against `https://api.anthropic.com`, you still need `ANTHROPIC_API_KEY`; OAuth-only inference transport is not implemented in this project yet.
+Если вы хотите использовать браузерный Claude OAuth из web UI, не передавайте в контейнер `ANTHROPIC_API_KEY` и `ANTHROPIC_AUTH_TOKEN`, потому что переменные окружения имеют приоритет над сохраненными OAuth-токенами.  
+Claw Web завершает OAuth через тот же loopback callback, что и `claw login`: `http://localhost:4545/callback`.  
+При запуске в Docker callback-порт должен публиковаться через `-p 4545:4545`, иначе браузер не сможет вернуть OAuth redirect внутрь контейнера.  
+Сохраненные Claude OAuth credentials сохраняются корректно, но этот runtime по умолчанию все еще отправляет прямые запросы в Anthropic Messages API. Для прямого inference против `https://api.anthropic.com` вам все равно нужен `ANTHROPIC_API_KEY`; OAuth-only transport для inference в этом проекте пока не реализован.
 
-For local non-Docker runs:
+Для локального запуска без Docker:
 
 ```bash
 cd rust
 cargo run -p web-api -- --cwd ..
 ```
 
-## Quick start
+## Быстрый старт
 
-### Interactive REPL
+### Интерактивный REPL
 
 ```bash
 cd rust
 ./target/debug/claw
 ```
 
-### One-shot prompt
+### Одноразовый prompt
 
 ```bash
 cd rust
 ./target/debug/claw prompt "summarize this repository"
 ```
 
-### Shorthand prompt mode
+### Сокращенный prompt-режим
 
 ```bash
 cd rust
 ./target/debug/claw "explain rust/crates/runtime/src/lib.rs"
 ```
 
-### JSON output for scripting
+### Вывод JSON для скриптов
 
 ```bash
 cd rust
 ./target/debug/claw --output-format json prompt "status"
 ```
 
-## Model and permission controls
+## Управление моделью и правами
 
 ```bash
 cd rust
@@ -136,21 +136,21 @@ cd rust
 ./target/debug/claw --allowedTools read,glob "inspect the runtime crate"
 ```
 
-Supported permission modes:
+Поддерживаемые режимы прав:
 
 - `read-only`
 - `workspace-write`
 - `danger-full-access`
 
-Model aliases currently supported by the CLI:
+Поддерживаемые alias моделей в CLI:
 
 - `opus` → `claude-opus-4-6`
 - `sonnet` → `claude-sonnet-4-6`
 - `haiku` → `claude-haiku-4-5-20251213`
 
-## Authentication
+## Аутентификация
 
-### API key
+### Ключ API
 
 ```bash
 read -s ANTHROPIC_API_KEY
@@ -158,7 +158,7 @@ echo
 export ANTHROPIC_API_KEY
 ```
 
-### OAuth
+### OAuth-аутентификация
 
 ```bash
 cd rust
@@ -166,7 +166,7 @@ cd rust
 ./target/debug/claw logout
 ```
 
-## Common operational commands
+## Часто используемые операционные команды
 
 ```bash
 cd rust
@@ -178,9 +178,9 @@ cd rust
 ./target/debug/claw system-prompt --cwd .. --date 2026-04-04
 ```
 
-## Session management
+## Управление сессиями
 
-REPL turns are persisted under `.claw/sessions/` in the current workspace.
+REPL-ходы сохраняются в `.claw/sessions/` внутри текущего workspace.
 
 ```bash
 cd rust
@@ -188,11 +188,11 @@ cd rust
 ./target/debug/claw --resume latest /status /diff
 ```
 
-Useful interactive commands include `/help`, `/status`, `/cost`, `/config`, `/session`, `/model`, `/permissions`, and `/export`.
+Полезные интерактивные команды: `/help`, `/status`, `/cost`, `/config`, `/session`, `/model`, `/permissions` и `/export`.
 
-## Config file resolution order
+## Порядок разрешения конфигурационных файлов
 
-Runtime config is loaded in this order, with later entries overriding earlier ones:
+Runtime загружает конфигурацию в таком порядке, причем более поздние записи переопределяют более ранние:
 
 1. `~/.claw.json`
 2. `~/.config/claw/settings.json`
@@ -200,32 +200,32 @@ Runtime config is loaded in this order, with later entries overriding earlier on
 4. `<repo>/.claw/settings.json`
 5. `<repo>/.claw/settings.local.json`
 
-## Mock parity harness
+## Стенд паритета на mock-сервисе
 
-The workspace includes a deterministic Anthropic-compatible mock service and parity harness.
+Workspace включает детерминированный mock-сервис, совместимый с Anthropic, и parity harness.
 
 ```bash
 cd rust
 ./scripts/run_mock_parity_harness.sh
 ```
 
-Manual mock service startup:
+Ручной запуск mock-сервиса:
 
 ```bash
 cd rust
 cargo run -p mock-anthropic-service -- --bind 127.0.0.1:0
 ```
 
-## Verification
+## Проверка
 
 ```bash
 cd rust
 cargo test --workspace
 ```
 
-## Workspace overview
+## Обзор workspace
 
-Current Rust crates:
+Текущие Rust crate’ы:
 
 - `api`
 - `commands`

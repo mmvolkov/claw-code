@@ -1,187 +1,187 @@
-# Parity Status — claw-code Rust Port
+# Статус паритета — Rust-порт `claw-code`
 
-Last updated: 2026-04-03
+Последнее обновление: 2026-04-03
 
-## Summary
+## Сводка
 
-- Canonical document: this top-level `PARITY.md` is the file consumed by `rust/scripts/run_mock_parity_diff.py`.
-- Requested 9-lane checkpoint: **All 9 lanes merged on `main`.**
-- Current `main` HEAD: `ee31e00` (stub implementations replaced with real AskUserQuestion + RemoteTrigger).
-- Repository stats at this checkpoint: **292 commits on `main` / 293 across all branches**, **9 crates**, **48,599 tracked Rust LOC**, **2,568 test LOC**, **3 authors**, date range **2026-03-31 → 2026-04-03**.
-- Mock parity harness stats: **10 scripted scenarios**, **19 captured `/v1/messages` requests** in `rust/crates/rusty-claude-cli/tests/mock_parity_harness.rs`.
+- Канонический документ: этот верхнеуровневый `PARITY.md` используется скриптом `rust/scripts/run_mock_parity_diff.py`.
+- Запрошенный checkpoint по 9 lane: **все 9 lane влиты в `main`.**
+- Текущий HEAD ветки `main`: `ee31e00` (stub-реализации заменены реальными `AskUserQuestion` + `RemoteTrigger`).
+- Статистика репозитория на этом checkpoint: **292 коммита в `main` / 293 по всем веткам**, **9 crate’ов**, **48,599 отслеживаемых строк Rust-кода**, **2,568 строк тестов**, **3 автора**, диапазон дат **2026-03-31 → 2026-04-03**.
+- Статистика mock parity harness: **10 scripted scenarios**, **19 зафиксированных запросов `/v1/messages`** в `rust/crates/rusty-claude-cli/tests/mock_parity_harness.rs`.
 
-## Mock parity harness — milestone 1
+## Стенд паритета на mock-сервисе — этап 1
 
-- [x] Deterministic Anthropic-compatible mock service (`rust/crates/mock-anthropic-service`)
-- [x] Reproducible clean-environment CLI harness (`rust/crates/rusty-claude-cli/tests/mock_parity_harness.rs`)
+- [x] Детерминированный mock-сервис, совместимый с Anthropic (`rust/crates/mock-anthropic-service`)
+- [x] Воспроизводимый CLI-harness в чистом окружении (`rust/crates/rusty-claude-cli/tests/mock_parity_harness.rs`)
 - [x] Scripted scenarios: `streaming_text`, `read_file_roundtrip`, `grep_chunk_assembly`, `write_file_allowed`, `write_file_denied`
 
-## Mock parity harness — milestone 2 (behavioral expansion)
+## Стенд паритета на mock-сервисе — этап 2 (расширение поведения)
 
-- [x] Scripted multi-tool turn coverage: `multi_tool_turn_roundtrip`
-- [x] Scripted bash coverage: `bash_stdout_roundtrip`
-- [x] Scripted permission prompt coverage: `bash_permission_prompt_approved`, `bash_permission_prompt_denied`
-- [x] Scripted plugin-path coverage: `plugin_tool_roundtrip`
-- [x] Behavioral diff/checklist runner: `rust/scripts/run_mock_parity_diff.py`
+- [x] Покрытие scripted multi-tool turn: `multi_tool_turn_roundtrip`
+- [x] Scripted-покрытие `bash`: `bash_stdout_roundtrip`
+- [x] Scripted-покрытие permission prompt: `bash_permission_prompt_approved`, `bash_permission_prompt_denied`
+- [x] Scripted-покрытие plugin-path: `plugin_tool_roundtrip`
+- [x] Runner для behavioral diff/checklist: `rust/scripts/run_mock_parity_diff.py`
 
-## Harness v2 behavioral checklist
+## Поведенческий checklist harness v2
 
-Canonical scenario map: `rust/mock_parity_scenarios.json`
+Каноническая карта сценариев: `rust/mock_parity_scenarios.json`
 
-- Multi-tool assistant turns
-- Bash flow roundtrips
-- Permission enforcement across tool paths
-- Plugin tool execution path
-- File tools — harness-validated flows
-- Streaming response support validated by the mock parity harness
+- Ходы ассистента с несколькими инструментами
+- Roundtrip для `bash`
+- Enforcement прав на разных tool-path
+- Путь выполнения plugin-tool
+- File tools — потоки, подтвержденные harness
+- Поддержка streaming response, подтвержденная mock parity harness
 
-## 9-lane checkpoint
+## Контрольная точка по 9 lane
 
-| Lane | Status | Feature commit | Merge commit | Evidence |
+| Lane | Статус | Feature commit | Merge commit | Доказательство |
 |---|---|---|---|---|
-| 1. Bash validation | merged | `36dac6c` | `1cfd78a` | `jobdori/bash-validation-submodules`, `rust/crates/runtime/src/bash_validation.rs` (`+1004` on `main`) |
-| 2. CI fix | merged | `89104eb` | `f1969ce` | `rust/crates/runtime/src/sandbox.rs` (`+22/-1`) |
+| 1. Валидация Bash | merged | `36dac6c` | `1cfd78a` | `jobdori/bash-validation-submodules`, `rust/crates/runtime/src/bash_validation.rs` (`+1004` в `main`) |
+| 2. Исправление CI | merged | `89104eb` | `f1969ce` | `rust/crates/runtime/src/sandbox.rs` (`+22/-1`) |
 | 3. File-tool | merged | `284163b` | `a98f2b6` | `rust/crates/runtime/src/file_ops.rs` (`+195/-1`) |
 | 4. TaskRegistry | merged | `5ea138e` | `21a1e1d` | `rust/crates/runtime/src/task_registry.rs` (`+336`) |
-| 5. Task wiring | merged | `e8692e4` | `d994be6` | `rust/crates/tools/src/lib.rs` (`+79/-35`) |
+| 5. Wiring задач | merged | `e8692e4` | `d994be6` | `rust/crates/tools/src/lib.rs` (`+79/-35`) |
 | 6. Team+Cron | merged | `c486ca6` | `49653fe` | `rust/crates/runtime/src/team_cron_registry.rs`, `rust/crates/tools/src/lib.rs` (`+441/-37`) |
-| 7. MCP lifecycle | merged | `730667f` | `cc0f92e` | `rust/crates/runtime/src/mcp_tool_bridge.rs`, `rust/crates/tools/src/lib.rs` (`+491/-24`) |
+| 7. Жизненный цикл MCP | merged | `730667f` | `cc0f92e` | `rust/crates/runtime/src/mcp_tool_bridge.rs`, `rust/crates/tools/src/lib.rs` (`+491/-24`) |
 | 8. LSP client | merged | `2d66503` | `d7f0dc6` | `rust/crates/runtime/src/lsp_client.rs`, `rust/crates/tools/src/lib.rs` (`+461/-9`) |
-| 9. Permission enforcement | merged | `66283f4` | `336f820` | `rust/crates/runtime/src/permission_enforcer.rs`, `rust/crates/tools/src/lib.rs` (`+357`) |
+| 9. Enforcement прав | merged | `66283f4` | `336f820` | `rust/crates/runtime/src/permission_enforcer.rs`, `rust/crates/tools/src/lib.rs` (`+357`) |
 
-## Lane details
+## Детали по lane
 
-### Lane 1 — Bash validation
+### Поток 1 — валидация Bash
 
-- **Status:** merged on `main`.
+- **Статус:** влита в `main`.
 - **Feature commit:** `36dac6c` — `feat: add bash validation submodules — readOnlyValidation, destructiveCommandWarning, modeValidation, sedValidation, pathValidation, commandSemantics`
-- **Evidence:** branch-only diff adds `rust/crates/runtime/src/bash_validation.rs` and a `runtime::lib` export (`+1005` across 2 files).
-- **Main-branch reality:** `rust/crates/runtime/src/bash.rs` is still the active on-`main` implementation at **283 LOC**, with timeout/background/sandbox execution. `PermissionEnforcer::check_bash()` adds read-only gating on `main`, but the dedicated validation module is not landed.
+- **Доказательство:** branch-only diff добавляет `rust/crates/runtime/src/bash_validation.rs` и export в `runtime::lib` (`+1005` в 2 файлах).
+- **Состояние в `main`:** `rust/crates/runtime/src/bash.rs` по-прежнему является активной реализацией в `main` и занимает **283 LOC**, обеспечивая timeout/background/sandbox execution. `PermissionEnforcer::check_bash()` уже добавляет блокировки для read-only режима в `main`, но выделенный validation-модуль еще не влит.
 
-### Bash tool — upstream has 18 submodules, Rust has 1:
+### Инструмент Bash — в upstream 18 submodule, в Rust 1:
 
-- On `main`, this statement is still materially true.
-- Harness coverage proves bash execution and prompt escalation flows, but not the full upstream validation matrix.
-- The branch-only lane targets `readOnlyValidation`, `destructiveCommandWarning`, `modeValidation`, `sedValidation`, `pathValidation`, and `commandSemantics`.
+- В ветке `main` это утверждение по-прежнему в целом верно.
+- Покрытие harness подтверждает выполнение `bash` и потоки повышения прав через prompt, но не весь validation matrix из upstream.
+- Branch-only lane нацелена на `readOnlyValidation`, `destructiveCommandWarning`, `modeValidation`, `sedValidation`, `pathValidation` и `commandSemantics`.
 
-### Lane 2 — CI fix
+### Поток 2 — исправление CI
 
-- **Status:** merged on `main`.
+- **Статус:** влита в `main`.
 - **Feature commit:** `89104eb` — `fix(sandbox): probe unshare capability instead of binary existence`
 - **Merge commit:** `f1969ce` — `Merge jobdori/fix-ci-sandbox: probe unshare capability for CI fix`
-- **Evidence:** `rust/crates/runtime/src/sandbox.rs` is **385 LOC** and now resolves sandbox support from actual `unshare` capability and container signals instead of assuming support from binary presence alone.
-- **Why it matters:** `.github/workflows/rust-ci.yml` runs `cargo fmt --all --check` and `cargo test -p rusty-claude-cli`; this lane removed a CI-specific sandbox assumption from runtime behavior.
+- **Доказательство:** `rust/crates/runtime/src/sandbox.rs` занимает **385 LOC** и теперь определяет поддержку sandbox на основе реальной возможности `unshare` и container signals, а не по одному лишь наличию бинарника.
+- **Почему это важно:** `.github/workflows/rust-ci.yml` запускает `cargo fmt --all --check` и `cargo test -p rusty-claude-cli`; эта lane убрала CI-специфичное предположение о sandbox из поведения runtime.
 
-### Lane 3 — File-tool
+### Поток 3 — file-tool
 
-- **Status:** merged on `main`.
+- **Статус:** влита в `main`.
 - **Feature commit:** `284163b` — `feat(file_ops): add edge-case guards — binary detection, size limits, workspace boundary, symlink escape`
 - **Merge commit:** `a98f2b6` — `Merge jobdori/file-tool-edge-cases: binary detection, size limits, workspace boundary guards`
-- **Evidence:** `rust/crates/runtime/src/file_ops.rs` is **744 LOC** and now includes `MAX_READ_SIZE`, `MAX_WRITE_SIZE`, NUL-byte binary detection, and canonical workspace-boundary validation.
-- **Harness coverage:** `read_file_roundtrip`, `grep_chunk_assembly`, `write_file_allowed`, and `write_file_denied` are in the manifest and exercised by the clean-env harness.
+- **Доказательство:** `rust/crates/runtime/src/file_ops.rs` занимает **744 LOC** и теперь содержит `MAX_READ_SIZE`, `MAX_WRITE_SIZE`, детекцию бинарных файлов по NUL-байтам и canonical-проверку границ workspace.
+- **Покрытие harness:** `read_file_roundtrip`, `grep_chunk_assembly`, `write_file_allowed` и `write_file_denied` перечислены в manifest и выполняются в clean-env harness.
 
-### File tools — harness-validated flows
+### File tools — потоки, подтвержденные стендом
 
-- `read_file_roundtrip` checks read-path execution and final synthesis.
-- `grep_chunk_assembly` checks chunked grep tool output handling.
-- `write_file_allowed` and `write_file_denied` validate both write success and permission denial.
+- `read_file_roundtrip` проверяет выполнение read-path и финальную сборку ответа.
+- `grep_chunk_assembly` проверяет обработку chunked-вывода инструмента grep.
+- `write_file_allowed` и `write_file_denied` подтверждают как успешную запись, так и отказ по правам.
 
-### Lane 4 — TaskRegistry
+### Поток 4 — TaskRegistry
 
-- **Status:** merged on `main`.
+- **Статус:** влита в `main`.
 - **Feature commit:** `5ea138e` — `feat(runtime): add TaskRegistry — in-memory task lifecycle management`
 - **Merge commit:** `21a1e1d` — `Merge jobdori/task-runtime: TaskRegistry in-memory lifecycle management`
-- **Evidence:** `rust/crates/runtime/src/task_registry.rs` is **335 LOC** and provides `create`, `get`, `list`, `stop`, `update`, `output`, `append_output`, `set_status`, and `assign_team` over a thread-safe in-memory registry.
-- **Scope:** this lane replaces pure fixed-payload stub state with real runtime-backed task records, but it does not add external subprocess execution by itself.
+- **Доказательство:** `rust/crates/runtime/src/task_registry.rs` занимает **335 LOC** и предоставляет `create`, `get`, `list`, `stop`, `update`, `output`, `append_output`, `set_status` и `assign_team` поверх thread-safe реестра в памяти.
+- **Область:** эта lane заменяет чисто stub-состояние на реальные runtime-backed записи задач, но сама по себе не добавляет внешнее subprocess-исполнение.
 
-### Lane 5 — Task wiring
+### Поток 5 — wiring задач
 
-- **Status:** merged on `main`.
+- **Статус:** влита в `main`.
 - **Feature commit:** `e8692e4` — `feat(tools): wire TaskRegistry into task tool dispatch`
 - **Merge commit:** `d994be6` — `Merge jobdori/task-registry-wiring: real TaskRegistry backing for all 6 task tools`
-- **Evidence:** `rust/crates/tools/src/lib.rs` dispatches `TaskCreate`, `TaskGet`, `TaskList`, `TaskStop`, `TaskUpdate`, and `TaskOutput` through `execute_tool()` and concrete `run_task_*` handlers.
-- **Current state:** task tools now expose real registry state on `main` via `global_task_registry()`.
+- **Доказательство:** `rust/crates/tools/src/lib.rs` dispatch’ит `TaskCreate`, `TaskGet`, `TaskList`, `TaskStop`, `TaskUpdate` и `TaskOutput` через `execute_tool()` и конкретные `run_task_*` handler’ы.
+- **Текущее состояние:** инструменты задач теперь раскрывают реальное состояние реестра в `main` через `global_task_registry()`.
 
-### Lane 6 — Team+Cron
+### Поток 6 — Team+Cron
 
-- **Status:** merged on `main`.
+- **Статус:** влита в `main`.
 - **Feature commit:** `c486ca6` — `feat(runtime+tools): TeamRegistry and CronRegistry — replace team/cron stubs`
 - **Merge commit:** `49653fe` — `Merge jobdori/team-cron-runtime: TeamRegistry + CronRegistry wired into tool dispatch`
-- **Evidence:** `rust/crates/runtime/src/team_cron_registry.rs` is **363 LOC** and adds thread-safe `TeamRegistry` and `CronRegistry`; `rust/crates/tools/src/lib.rs` wires `TeamCreate`, `TeamDelete`, `CronCreate`, `CronDelete`, and `CronList` into those registries.
-- **Current state:** team/cron tools now have in-memory lifecycle behavior on `main`; they still stop short of a real background scheduler or worker fleet.
+- **Доказательство:** `rust/crates/runtime/src/team_cron_registry.rs` занимает **363 LOC** и добавляет thread-safe `TeamRegistry` и `CronRegistry`; `rust/crates/tools/src/lib.rs` подключает к ним `TeamCreate`, `TeamDelete`, `CronCreate`, `CronDelete` и `CronList`.
+- **Текущее состояние:** инструменты `team` и `cron` теперь имеют in-memory lifecycle behavior в `main`; до реального background scheduler или worker fleet они пока не доходят.
 
-### Lane 7 — MCP lifecycle
+### Поток 7 — жизненный цикл MCP
 
-- **Status:** merged on `main`.
+- **Статус:** влита в `main`.
 - **Feature commit:** `730667f` — `feat(runtime+tools): McpToolRegistry — MCP lifecycle bridge for tool surface`
 - **Merge commit:** `cc0f92e` — `Merge jobdori/mcp-lifecycle: McpToolRegistry lifecycle bridge for all MCP tools`
-- **Evidence:** `rust/crates/runtime/src/mcp_tool_bridge.rs` is **406 LOC** and tracks server connection status, resource listing, resource reads, tool listing, tool dispatch acknowledgements, auth state, and disconnects.
-- **Wiring:** `rust/crates/tools/src/lib.rs` routes `ListMcpResources`, `ReadMcpResource`, `McpAuth`, and `MCP` into `global_mcp_registry()` handlers.
-- **Scope:** this lane replaces pure stub responses with a registry bridge on `main`; end-to-end MCP connection population and broader transport/runtime depth still depend on the wider MCP runtime (`mcp_stdio.rs`, `mcp_client.rs`, `mcp.rs`).
+- **Доказательство:** `rust/crates/runtime/src/mcp_tool_bridge.rs` занимает **406 LOC** и отслеживает статус подключения серверов, список ресурсов, чтение ресурсов, список инструментов, подтверждения dispatch, auth state и disconnect.
+- **Wiring:** `rust/crates/tools/src/lib.rs` направляет `ListMcpResources`, `ReadMcpResource`, `McpAuth` и `MCP` в handler’ы `global_mcp_registry()`.
+- **Область:** эта lane заменяет чисто stub-ответы на registry bridge в `main`; глубина end-to-end для подключения MCP и транспорта все еще зависит от более широкого MCP runtime (`mcp_stdio.rs`, `mcp_client.rs`, `mcp.rs`).
 
-### Lane 8 — LSP client
+### Поток 8 — LSP client
 
-- **Status:** merged on `main`.
+- **Статус:** влита в `main`.
 - **Feature commit:** `2d66503` — `feat(runtime+tools): LspRegistry — LSP client dispatch for tool surface`
 - **Merge commit:** `d7f0dc6` — `Merge jobdori/lsp-client: LspRegistry dispatch for all LSP tool actions`
-- **Evidence:** `rust/crates/runtime/src/lsp_client.rs` is **438 LOC** and models diagnostics, hover, definition, references, completion, symbols, and formatting across a stateful registry.
-- **Wiring:** the exposed `LSP` tool schema in `rust/crates/tools/src/lib.rs` currently enumerates `symbols`, `references`, `diagnostics`, `definition`, and `hover`, then routes requests through `registry.dispatch(action, path, line, character, query)`.
-- **Scope:** current parity is registry/dispatch-level; completion/format support exists in the registry model, but not as clearly exposed at the tool schema boundary, and actual external language-server process orchestration remains separate.
+- **Доказательство:** `rust/crates/runtime/src/lsp_client.rs` занимает **438 LOC** и моделирует diagnostics, hover, definition, references, completion, symbols и formatting через stateful registry.
+- **Wiring:** открытая схема инструмента `LSP` в `rust/crates/tools/src/lib.rs` сейчас перечисляет `symbols`, `references`, `diagnostics`, `definition` и `hover`, после чего направляет запрос в `registry.dispatch(action, path, line, character, query)`.
+- **Область:** текущий паритет достигнут на уровне registry/dispatch; поддержка completion/formatting существует в модели реестра, но не так явно открыта на границе tool schema, а реальная оркестрация внешних language server-процессов пока вынесена отдельно.
 
-### Lane 9 — Permission enforcement
+### Поток 9 — enforcement прав
 
-- **Status:** merged on `main`.
+- **Статус:** влита в `main`.
 - **Feature commit:** `66283f4` — `feat(runtime+tools): PermissionEnforcer — permission mode enforcement layer`
 - **Merge commit:** `336f820` — `Merge jobdori/permission-enforcement: PermissionEnforcer with workspace + bash enforcement`
-- **Evidence:** `rust/crates/runtime/src/permission_enforcer.rs` is **340 LOC** and adds tool gating, file write boundary checks, and bash read-only heuristics on top of `rust/crates/runtime/src/permissions.rs`.
-- **Wiring:** `rust/crates/tools/src/lib.rs` exposes `enforce_permission_check()` and carries per-tool `required_permission` values in tool specs.
+- **Доказательство:** `rust/crates/runtime/src/permission_enforcer.rs` занимает **340 LOC** и добавляет gating инструментов, проверку границ file write и read-only эвристики для `bash` поверх `rust/crates/runtime/src/permissions.rs`.
+- **Wiring:** `rust/crates/tools/src/lib.rs` экспортирует `enforce_permission_check()` и хранит `required_permission` для каждого инструмента в tool spec.
 
-### Permission enforcement across tool paths
+### Enforcement прав на разных tool-path
 
-- Harness scenarios validate `write_file_denied`, `bash_permission_prompt_approved`, and `bash_permission_prompt_denied`.
-- `PermissionEnforcer::check()` delegates to `PermissionPolicy::authorize()` and returns structured allow/deny results.
-- `check_file_write()` enforces workspace boundaries and read-only denial; `check_bash()` denies mutating commands in read-only mode and blocks prompt-mode bash without confirmation.
+- Сценарии harness проверяют `write_file_denied`, `bash_permission_prompt_approved` и `bash_permission_prompt_denied`.
+- `PermissionEnforcer::check()` делегирует в `PermissionPolicy::authorize()` и возвращает структурированные результаты allow/deny.
+- `check_file_write()` обеспечивает соблюдение границ workspace и read-only запретов; `check_bash()` запрещает мутирующие команды в read-only режиме и блокирует prompt-mode `bash` без подтверждения.
 
-## Tool Surface: 40 exposed tool specs on `main`
+## Поверхность инструментов: 40 открытых tool spec в `main`
 
-- `mvp_tool_specs()` in `rust/crates/tools/src/lib.rs` exposes **40** tool specs.
-- Core execution is present for `bash`, `read_file`, `write_file`, `edit_file`, `glob_search`, and `grep_search`.
-- Existing product tools in `mvp_tool_specs()` include `WebFetch`, `WebSearch`, `TodoWrite`, `Skill`, `Agent`, `ToolSearch`, `NotebookEdit`, `Sleep`, `SendUserMessage`, `Config`, `EnterPlanMode`, `ExitPlanMode`, `StructuredOutput`, `REPL`, and `PowerShell`.
-- The 9-lane push replaced pure fixed-payload stubs for `Task*`, `Team*`, `Cron*`, `LSP`, and MCP tools with registry-backed handlers on `main`.
-- `Brief` is handled as an execution alias in `execute_tool()`, but it is not a separately exposed tool spec in `mvp_tool_specs()`.
+- `mvp_tool_specs()` в `rust/crates/tools/src/lib.rs` раскрывает **40** tool spec.
+- Базовое исполнение реализовано для `bash`, `read_file`, `write_file`, `edit_file`, `glob_search` и `grep_search`.
+- Уже существующие продуктовые инструменты в `mvp_tool_specs()` включают `WebFetch`, `WebSearch`, `TodoWrite`, `Skill`, `Agent`, `ToolSearch`, `NotebookEdit`, `Sleep`, `SendUserMessage`, `Config`, `EnterPlanMode`, `ExitPlanMode`, `StructuredOutput`, `REPL` и `PowerShell`.
+- Push из 9 lane заменил чисто fixed-payload stub’ы для `Task*`, `Team*`, `Cron*`, `LSP` и MCP tools на registry-backed handler’ы в `main`.
+- `Brief` обрабатывается как alias выполнения в `execute_tool()`, но не является отдельным открытым tool spec в `mvp_tool_specs()`.
 
-### Still limited or intentionally shallow
+### Все еще ограничено или сознательно упрощено
 
-- `AskUserQuestion` still returns a pending response payload rather than real interactive UI wiring.
-- `RemoteTrigger` remains a stub response.
-- `TestingPermission` remains test-only.
-- Task, team, cron, MCP, and LSP are no longer just fixed-payload stubs in `execute_tool()`, but several remain registry-backed approximations rather than full external-runtime integrations.
-- Bash deep validation remains branch-only until `36dac6c` is merged.
+- `AskUserQuestion` по-прежнему возвращает pending-response payload, а не настоящую интерактивную UI-интеграцию.
+- `RemoteTrigger` остается stub-ответом.
+- `TestingPermission` остается только тестовым.
+- `Task`, `team`, `cron`, `MCP` и `LSP` больше не являются просто fixed-payload stub’ами внутри `execute_tool()`, но часть из них по-прежнему представляют собой registry-backed приближения, а не полные интеграции с внешним runtime.
+- Глубокая валидация `bash` до сих пор branch-only, пока не будет влит `36dac6c`.
 
-## Reconciled from the older PARITY checklist
+## Сверка со старым PARITY-checklist
 
-- [x] Path traversal prevention (symlink following, `../` escapes)
-- [x] Size limits on read/write
-- [x] Binary file detection
-- [x] Permission mode enforcement (read-only vs workspace-write)
-- [x] Config merge precedence (user > project > local) — `ConfigLoader::discover()` loads user → project → local, and `loads_and_merges_claude_code_config_files_by_precedence()` verifies the merge order.
-- [x] Plugin install/enable/disable/uninstall flow — `/plugin` slash handling in `rust/crates/commands/src/lib.rs` delegates to `PluginManager::{install, enable, disable, uninstall}` in `rust/crates/plugins/src/lib.rs`.
-- [x] No `#[ignore]` tests hiding failures — `grep` over `rust/**/*.rs` found 0 ignored tests.
+- [x] Предотвращение path traversal (`symlink`-переходы, `../`-escape)
+- [x] Ограничения размера для read/write
+- [x] Детекция бинарных файлов
+- [x] Enforcement permission mode (`read-only` vs `workspace-write`)
+- [x] Приоритет слияния config (user > project > local) — `ConfigLoader::discover()` загружает `user → project → local`, а `loads_and_merges_claude_code_config_files_by_precedence()` проверяет этот порядок.
+- [x] Поток plugin install/enable/disable/uninstall — slash-handling `/plugin` в `rust/crates/commands/src/lib.rs` делегирует в `PluginManager::{install, enable, disable, uninstall}` в `rust/crates/plugins/src/lib.rs`.
+- [x] Нет `#[ignore]`-тестов, скрывающих падения — `grep` по `rust/**/*.rs` нашел 0 ignored-тестов.
 
-## Still open
+## Что еще открыто
 
-- [ ] End-to-end MCP runtime lifecycle beyond the registry bridge now on `main`
-- [x] Output truncation (large stdout/file content)
-- [ ] Session compaction behavior matching
-- [ ] Token counting / cost tracking accuracy
-- [x] Bash validation lane merged onto `main`
-- [ ] CI green on every commit
+- [ ] End-to-end жизненный цикл MCP runtime за пределами bridge-реестра, который уже есть в `main`
+- [x] Обрезка вывода (большой `stdout` / содержимое файлов)
+- [ ] Поведение session compaction в полном соответствии
+- [ ] Точность подсчета токенов / учета стоимости
+- [x] Lane валидации Bash влита в `main`
+- [ ] CI зеленый на каждом коммите
 
-## Migration Readiness
+## Готовность к миграции
 
-- [x] `PARITY.md` maintained and honest
-- [x] 9 requested lanes documented with commit hashes and current status
-- [x] All 9 requested lanes landed on `main` (`bash-validation` is still branch-only)
-- [x] No `#[ignore]` tests hiding failures
-- [ ] CI green on every commit
-- [x] Codebase shape clean enough for handoff documentation
+- [x] `PARITY.md` поддерживается в актуальном и честном состоянии
+- [x] Все 9 запрошенных lane задокументированы с хэшами коммитов и текущим статусом
+- [x] Все 9 запрошенных lane landed на `main` (`bash-validation` все еще branch-only)
+- [x] Нет `#[ignore]`-тестов, скрывающих падения
+- [ ] CI зеленый на каждом коммите
+- [x] Форма кодовой базы достаточно чистая для handoff-документации

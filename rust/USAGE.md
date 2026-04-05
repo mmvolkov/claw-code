@@ -1,12 +1,12 @@
-# Rust usage guide
+# Руководство по использованию Rust-версии
 
-The canonical task-oriented usage guide lives at [`../USAGE.md`](../USAGE.md).
-The detailed setup and operations runbook lives at [`../docs/SETUP_AND_OPERATIONS.md`](../docs/SETUP_AND_OPERATIONS.md).
+Каноническое практическое руководство находится в [`../USAGE.md`](../USAGE.md).
+Подробный runbook по установке и эксплуатации находится в [`../docs/SETUP_AND_OPERATIONS.md`](../docs/SETUP_AND_OPERATIONS.md).
 
-Use that guide for:
+Используйте эти документы для:
 
-- workspace build and test commands
-- authentication setup
-- interactive and one-shot `claw` examples
-- session resume workflows
-- mock parity harness commands
+- сборки workspace и запуска тестов
+- настройки аутентификации
+- примеров интерактивного и одноразового запуска `claw`
+- сценариев возобновления сессий
+- команд mock parity harness

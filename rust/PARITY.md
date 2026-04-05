@@ -1,148 +1,148 @@
-# Parity Status — claw-code Rust Port
+# Статус паритета — Rust-порт `claw-code`
 
-Last updated: 2026-04-03
+Последнее обновление: 2026-04-03
 
-## Mock parity harness — milestone 1
+## Стенд паритета на mock-сервисе — этап 1
 
-- [x] Deterministic Anthropic-compatible mock service (`rust/crates/mock-anthropic-service`)
-- [x] Reproducible clean-environment CLI harness (`rust/crates/rusty-claude-cli/tests/mock_parity_harness.rs`)
+- [x] Детерминированный mock-сервис, совместимый с Anthropic (`rust/crates/mock-anthropic-service`)
+- [x] Воспроизводимый CLI-harness в чистом окружении (`rust/crates/rusty-claude-cli/tests/mock_parity_harness.rs`)
 - [x] Scripted scenarios: `streaming_text`, `read_file_roundtrip`, `grep_chunk_assembly`, `write_file_allowed`, `write_file_denied`
 
-## Mock parity harness — milestone 2 (behavioral expansion)
+## Стенд паритета на mock-сервисе — этап 2 (расширение поведения)
 
-- [x] Scripted multi-tool turn coverage: `multi_tool_turn_roundtrip`
-- [x] Scripted bash coverage: `bash_stdout_roundtrip`
-- [x] Scripted permission prompt coverage: `bash_permission_prompt_approved`, `bash_permission_prompt_denied`
-- [x] Scripted plugin-path coverage: `plugin_tool_roundtrip`
-- [x] Behavioral diff/checklist runner: `rust/scripts/run_mock_parity_diff.py`
+- [x] Scripted-покрытие multi-tool turn: `multi_tool_turn_roundtrip`
+- [x] Scripted-покрытие `bash`: `bash_stdout_roundtrip`
+- [x] Scripted-покрытие permission prompt: `bash_permission_prompt_approved`, `bash_permission_prompt_denied`
+- [x] Scripted-покрытие plugin-path: `plugin_tool_roundtrip`
+- [x] Runner для behavioral diff/checklist: `rust/scripts/run_mock_parity_diff.py`
 
-## Harness v2 behavioral checklist
+## Поведенческий checklist harness v2
 
-Canonical scenario map: `rust/mock_parity_scenarios.json`
+Каноническая карта сценариев: `rust/mock_parity_scenarios.json`
 
-- Multi-tool assistant turns
-- Bash flow roundtrips
-- Permission enforcement across tool paths
-- Plugin tool execution path
-- File tools — harness-validated flows
+- Ходы ассистента с несколькими инструментами
+- Roundtrip для `bash`
+- Enforcement прав на разных tool-path
+- Путь выполнения plugin-tool
+- File tools — потоки, подтвержденные harness
 
-## Completed Behavioral Parity Work
+## Завершенная работа по behavioral parity
 
-Hashes below come from `git log --oneline`. Merge line counts come from `git show --stat <merge>`.
+Хэши ниже взяты из `git log --oneline`. Подсчет строк в merge — из `git show --stat <merge>`.
 
-| Lane | Status | Feature commit | Merge commit | Diff stat |
+| Lane | Статус | Feature commit | Merge commit | Diff stat |
 |------|--------|----------------|--------------|-----------|
-| Bash validation (9 submodules) | ✅ complete | `36dac6c` | — (`jobdori/bash-validation-submodules`) | `1005 insertions` |
-| CI fix | ✅ complete | `89104eb` | `f1969ce` | `22 insertions, 1 deletion` |
-| File-tool edge cases | ✅ complete | `284163b` | `a98f2b6` | `195 insertions, 1 deletion` |
+| Валидация Bash (9 submodule) | ✅ complete | `36dac6c` | — (`jobdori/bash-validation-submodules`) | `1005 insertions` |
+| Исправление CI | ✅ complete | `89104eb` | `f1969ce` | `22 insertions, 1 deletion` |
+| Edge-cases для File-tool | ✅ complete | `284163b` | `a98f2b6` | `195 insertions, 1 deletion` |
 | TaskRegistry | ✅ complete | `5ea138e` | `21a1e1d` | `336 insertions` |
-| Task tool wiring | ✅ complete | `e8692e4` | `d994be6` | `79 insertions, 35 deletions` |
-| Team + cron runtime | ✅ complete | `c486ca6` | `49653fe` | `441 insertions, 37 deletions` |
-| MCP lifecycle | ✅ complete | `730667f` | `cc0f92e` | `491 insertions, 24 deletions` |
+| Wiring task tool | ✅ complete | `e8692e4` | `d994be6` | `79 insertions, 35 deletions` |
+| Runtime для team + cron | ✅ complete | `c486ca6` | `49653fe` | `441 insertions, 37 deletions` |
+| Жизненный цикл MCP | ✅ complete | `730667f` | `cc0f92e` | `491 insertions, 24 deletions` |
 | LSP client | ✅ complete | `2d66503` | `d7f0dc6` | `461 insertions, 9 deletions` |
-| Permission enforcement | ✅ complete | `66283f4` | `336f820` | `357 insertions` |
+| Enforcement прав | ✅ complete | `66283f4` | `336f820` | `357 insertions` |
 
-## Tool Surface: 40/40 (spec parity)
+## Поверхность инструментов: 40/40 (паритет по spec)
 
-### Real Implementations (behavioral parity — varying depth)
+### Реальные реализации (behavioral parity разной глубины)
 
-| Tool | Rust Impl | Behavioral Notes |
+| Tool | Rust Impl | Поведенческие заметки |
 |------|-----------|-----------------|
-| **bash** | `runtime::bash` 283 LOC | subprocess exec, timeout, background, sandbox — **strong parity**. 9/9 requested validation submodules are now tracked as complete via `36dac6c`, with on-main sandbox + permission enforcement runtime support |
-| **read_file** | `runtime::file_ops` | offset/limit read — **good parity** |
-| **write_file** | `runtime::file_ops` | file create/overwrite — **good parity** |
-| **edit_file** | `runtime::file_ops` | old/new string replacement — **good parity**. Missing: replace_all was recently added |
-| **glob_search** | `runtime::file_ops` | glob pattern matching — **good parity** |
-| **grep_search** | `runtime::file_ops` | ripgrep-style search — **good parity** |
-| **WebFetch** | `tools` | URL fetch + content extraction — **moderate parity** (need to verify content truncation, redirect handling vs upstream) |
-| **WebSearch** | `tools` | search query execution — **moderate parity** |
-| **TodoWrite** | `tools` | todo/note persistence — **moderate parity** |
-| **Skill** | `tools` | skill discovery/install — **moderate parity** |
-| **Agent** | `tools` | agent delegation — **moderate parity** |
-| **TaskCreate** | `runtime::task_registry` + `tools` | in-memory task creation wired into tool dispatch — **good parity** |
-| **TaskGet** | `runtime::task_registry` + `tools` | task lookup + metadata payload — **good parity** |
-| **TaskList** | `runtime::task_registry` + `tools` | registry-backed task listing — **good parity** |
-| **TaskStop** | `runtime::task_registry` + `tools` | terminal-state stop handling — **good parity** |
-| **TaskUpdate** | `runtime::task_registry` + `tools` | registry-backed message updates — **good parity** |
-| **TaskOutput** | `runtime::task_registry` + `tools` | output capture retrieval — **good parity** |
-| **TeamCreate** | `runtime::team_cron_registry` + `tools` | team lifecycle + task assignment — **good parity** |
-| **TeamDelete** | `runtime::team_cron_registry` + `tools` | team delete lifecycle — **good parity** |
-| **CronCreate** | `runtime::team_cron_registry` + `tools` | cron entry creation — **good parity** |
-| **CronDelete** | `runtime::team_cron_registry` + `tools` | cron entry removal — **good parity** |
-| **CronList** | `runtime::team_cron_registry` + `tools` | registry-backed cron listing — **good parity** |
-| **LSP** | `runtime::lsp_client` + `tools` | registry + dispatch for diagnostics, hover, definition, references, completion, symbols, formatting — **good parity** |
-| **ListMcpResources** | `runtime::mcp_tool_bridge` + `tools` | connected-server resource listing — **good parity** |
-| **ReadMcpResource** | `runtime::mcp_tool_bridge` + `tools` | connected-server resource reads — **good parity** |
-| **MCP** | `runtime::mcp_tool_bridge` + `tools` | stateful MCP tool invocation bridge — **good parity** |
-| **ToolSearch** | `tools` | tool discovery — **good parity** |
-| **NotebookEdit** | `tools` | jupyter notebook cell editing — **moderate parity** |
-| **Sleep** | `tools` | delay execution — **good parity** |
-| **SendUserMessage/Brief** | `tools` | user-facing message — **good parity** |
-| **Config** | `tools` | config inspection — **moderate parity** |
-| **EnterPlanMode** | `tools` | worktree plan mode toggle — **good parity** |
-| **ExitPlanMode** | `tools` | worktree plan mode restore — **good parity** |
-| **StructuredOutput** | `tools` | passthrough JSON — **good parity** |
-| **REPL** | `tools` | subprocess code execution — **moderate parity** |
-| **PowerShell** | `tools` | Windows PowerShell execution — **moderate parity** |
+| **bash** | `runtime::bash` 283 LOC | выполнение subprocess, timeout, background, sandbox — **сильный паритет**. Все 9/9 запрошенных validation-submodule теперь учитываются как completed через `36dac6c`, а в `main` уже есть runtime-поддержка sandbox + permission enforcement |
+| **read_file** | `runtime::file_ops` | чтение с offset/limit — **хороший паритет** |
+| **write_file** | `runtime::file_ops` | создание/перезапись файлов — **хороший паритет** |
+| **edit_file** | `runtime::file_ops` | замена строк old/new — **хороший паритет**. Недостающее: недавно добавлен `replace_all` |
+| **glob_search** | `runtime::file_ops` | сопоставление glob-паттернов — **хороший паритет** |
+| **grep_search** | `runtime::file_ops` | поиск в стиле `ripgrep` — **хороший паритет** |
+| **WebFetch** | `tools` | загрузка URL + извлечение контента — **умеренный паритет** (нужно дополнительно сверить обрезку контента и redirect handling относительно upstream) |
+| **WebSearch** | `tools` | выполнение поисковых запросов — **умеренный паритет** |
+| **TodoWrite** | `tools` | сохранение todo/заметок — **умеренный паритет** |
+| **Skill** | `tools` | discovery/install skills — **умеренный паритет** |
+| **Agent** | `tools` | делегирование агентам — **умеренный паритет** |
+| **TaskCreate** | `runtime::task_registry` + `tools` | создание задач в памяти, подключенное к tool dispatch — **хороший паритет** |
+| **TaskGet** | `runtime::task_registry` + `tools` | lookup задач + payload с метаданными — **хороший паритет** |
+| **TaskList** | `runtime::task_registry` + `tools` | listing задач через реестр — **хороший паритет** |
+| **TaskStop** | `runtime::task_registry` + `tools` | обработка остановки и terminal state — **хороший паритет** |
+| **TaskUpdate** | `runtime::task_registry` + `tools` | обновления сообщений через реестр — **хороший паритет** |
+| **TaskOutput** | `runtime::task_registry` + `tools` | получение накопленного вывода — **хороший паритет** |
+| **TeamCreate** | `runtime::team_cron_registry` + `tools` | жизненный цикл команд + назначение задач — **хороший паритет** |
+| **TeamDelete** | `runtime::team_cron_registry` + `tools` | удаление команд — **хороший паритет** |
+| **CronCreate** | `runtime::team_cron_registry` + `tools` | создание cron-записей — **хороший паритет** |
+| **CronDelete** | `runtime::team_cron_registry` + `tools` | удаление cron-записей — **хороший паритет** |
+| **CronList** | `runtime::team_cron_registry` + `tools` | listing cron через реестр — **хороший паритет** |
+| **LSP** | `runtime::lsp_client` + `tools` | реестр + dispatch для diagnostics, hover, definition, references, completion, symbols, formatting — **хороший паритет** |
+| **ListMcpResources** | `runtime::mcp_tool_bridge` + `tools` | listing ресурсов подключенных серверов — **хороший паритет** |
+| **ReadMcpResource** | `runtime::mcp_tool_bridge` + `tools` | чтение ресурсов подключенных серверов — **хороший паритет** |
+| **MCP** | `runtime::mcp_tool_bridge` + `tools` | stateful bridge для вызова MCP-инструментов — **хороший паритет** |
+| **ToolSearch** | `tools` | discovery инструментов — **хороший паритет** |
+| **NotebookEdit** | `tools` | редактирование ячеек Jupyter notebook — **умеренный паритет** |
+| **Sleep** | `tools` | задержка выполнения — **хороший паритет** |
+| **SendUserMessage/Brief** | `tools` | сообщение пользователю — **хороший паритет** |
+| **Config** | `tools` | inspection конфигурации — **умеренный паритет** |
+| **EnterPlanMode** | `tools` | переключение worktree в plan mode — **хороший паритет** |
+| **ExitPlanMode** | `tools` | восстановление worktree из plan mode — **хороший паритет** |
+| **StructuredOutput** | `tools` | passthrough JSON — **хороший паритет** |
+| **REPL** | `tools` | выполнение кода через subprocess — **умеренный паритет** |
+| **PowerShell** | `tools` | выполнение Windows PowerShell — **умеренный паритет** |
 
-### Stubs Only (surface parity, no behavior)
+### Только stub’ы (паритет по surface, без поведения)
 
-| Tool | Status | Notes |
+| Tool | Статус | Заметки |
 |------|--------|-------|
-| **AskUserQuestion** | stub | needs live user I/O integration |
-| **McpAuth** | stub | needs full auth UX beyond the MCP lifecycle bridge |
-| **RemoteTrigger** | stub | needs HTTP client |
-| **TestingPermission** | stub | test-only, low priority |
+| **AskUserQuestion** | stub | нужна живая интеграция с пользовательским I/O |
+| **McpAuth** | stub | нужен полноценный auth UX сверх MCP lifecycle bridge |
+| **RemoteTrigger** | stub | нужен HTTP-клиент |
+| **TestingPermission** | stub | только для тестов, низкий приоритет |
 
-## Slash Commands: 67/141 upstream entries
+## Слэш-команды: 67/141 upstream entries
 
-- 27 original specs (pre-today) — all with real handlers
-- 40 new specs — parse + stub handler ("not yet implemented")
-- Remaining ~74 upstream entries are internal modules/dialogs/steps, not user `/commands`
+- 27 исходных spec — все с реальными handler’ами
+- 40 новых spec — parse + stub handler (`not yet implemented`)
+- Оставшиеся ~74 upstream entry — это внутренние модули/диалоги/шаги, а не пользовательские `/commands`
 
-### Behavioral Feature Checkpoints (completed work + remaining gaps)
+### Поведенческие checkpoints по функциональности (завершенная работа + оставшиеся разрывы)
 
-**Bash tool — 9/9 requested validation submodules complete:**
-- [x] `sedValidation` — validate sed commands before execution
-- [x] `pathValidation` — validate file paths in commands
-- [x] `readOnlyValidation` — block writes in read-only mode
-- [x] `destructiveCommandWarning` — warn on rm -rf, etc.
-- [x] `commandSemantics` — classify command intent
-- [x] `bashPermissions` — permission gating per command type
+**Инструмент Bash — все 9/9 запрошенных validation submodule завершены:**
+- [x] `sedValidation` — валидация команд `sed` перед выполнением
+- [x] `pathValidation` — валидация путей к файлам в командах
+- [x] `readOnlyValidation` — блокировка записи в read-only режиме
+- [x] `destructiveCommandWarning` — предупреждение для `rm -rf` и подобных команд
+- [x] `commandSemantics` — классификация намерения команды
+- [x] `bashPermissions` — permission gating по типу команды
 - [x] `bashSecurity` — security checks
-- [x] `modeValidation` — validate against current permission mode
-- [x] `shouldUseSandbox` — sandbox decision logic
+- [x] `modeValidation` — валидация относительно текущего режима прав
+- [x] `shouldUseSandbox` — логика принятия решения о sandbox
 
-Harness note: milestone 2 validates bash success plus workspace-write escalation approve/deny flows; dedicated validation submodules landed in `36dac6c`, and on-main runtime also carries sandbox + permission enforcement.
+Примечание по harness: milestone 2 проверяет успешный `bash`, а также approve/deny-потоки для повышения прав в режиме `workspace-write`; выделенные validation-submodule landed в `36dac6c`, а runtime в `main` уже содержит sandbox + permission enforcement.
 
-**File tools — completed checkpoint:**
-- [x] Path traversal prevention (symlink following, ../ escapes)
-- [x] Size limits on read/write
-- [x] Binary file detection
-- [x] Permission mode enforcement (read-only vs workspace-write)
+**File tools — завершенный checkpoint:**
+- [x] Предотвращение path traversal (`symlink`, `../`-escape)
+- [x] Ограничения размера для read/write
+- [x] Детекция бинарных файлов
+- [x] Enforcement permission mode (`read-only` vs `workspace-write`)
 
-Harness note: read_file, grep_search, write_file allow/deny, and multi-tool same-turn assembly are now covered by the mock parity harness; file edge cases + permission enforcement landed in `a98f2b6` and `336f820`.
+Примечание по harness: `read_file`, `grep_search`, allow/deny для `write_file` и сборка multi-tool в рамках одного turn теперь покрыты mock parity harness; edge-cases для файлов и permission enforcement landed в `a98f2b6` и `336f820`.
 
 **Config/Plugin/MCP flows:**
-- [x] Full MCP server lifecycle (connect, list tools, call tool, disconnect)
-- [ ] Plugin install/enable/disable/uninstall full flow
-- [ ] Config merge precedence (user > project > local)
+- [x] Полный жизненный цикл MCP-сервера (connect, list tools, call tool, disconnect)
+- [ ] Полный поток plugin install/enable/disable/uninstall
+- [ ] Приоритет merge для config (user > project > local)
 
-Harness note: external plugin discovery + execution is now covered via `plugin_tool_roundtrip`; MCP lifecycle landed in `cc0f92e`, while plugin lifecycle + config merge precedence remain open.
+Примечание по harness: внешнее обнаружение и выполнение plugin’ов теперь покрыто через `plugin_tool_roundtrip`; MCP lifecycle landed в `cc0f92e`, а plugin lifecycle и приоритет merge конфигурации пока остаются открытыми.
 
-## Runtime Behavioral Gaps
+## Разрывы поведения в runtime
 
-- [x] Permission enforcement across all tools (read-only, workspace-write, danger-full-access)
-- [ ] Output truncation (large stdout/file content)
-- [ ] Session compaction behavior matching
-- [ ] Token counting / cost tracking accuracy
-- [x] Streaming response support validated by the mock parity harness
+- [x] Enforcement прав для всех инструментов (`read-only`, `workspace-write`, `danger-full-access`)
+- [ ] Обрезка вывода (большой `stdout` / содержимое файлов)
+- [ ] Поведение session compaction в полном соответствии
+- [ ] Точность подсчета токенов / учета стоимости
+- [x] Поддержка streaming response подтверждена mock parity harness
 
-Harness note: current coverage now includes write-file denial, bash escalation approve/deny, and plugin workspace-write execution paths; permission enforcement landed in `336f820`.
+Примечание по harness: текущее покрытие уже включает отказ записи в файл, approve/deny для `bash` escalation и выполнение plugin’ов с `workspace-write`; permission enforcement landed в `336f820`.
 
-## Migration Readiness
+## Готовность к миграции
 
-- [x] `PARITY.md` maintained and honest
-- [ ] No `#[ignore]` tests hiding failures (only 1 allowed: `live_stream_smoke_test`)
-- [ ] CI green on every commit
-- [ ] Codebase shape clean for handoff
+- [x] `PARITY.md` поддерживается в актуальном и честном состоянии
+- [ ] Нет `#[ignore]`-тестов, скрывающих падения (допускается только 1: `live_stream_smoke_test`)
+- [ ] CI зеленый на каждом коммите
+- [ ] Форма кодовой базы достаточно чистая для handoff

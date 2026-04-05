@@ -1,114 +1,114 @@
-# Claw Code Philosophy
+# Философия Claw Code
 
-## Stop Staring at the Files
+## Перестаньте смотреть только на файлы
 
-If you only look at the generated files in this repository, you are looking at the wrong layer.
+Если вы смотрите только на сгенерированные файлы в этом репозитории, вы смотрите не на тот уровень.
 
-The Python rewrite was a byproduct. The Rust rewrite was also a byproduct. The real thing worth studying is the **system that produced them**: a clawhip-based coordination loop where humans give direction and autonomous claws execute the work.
+Python-переписывание было побочным эффектом. Rust-переписывание тоже было побочным эффектом. Настоящий объект изучения — **система, которая их породила**: цикл координации на базе clawhip, где люди задают направление, а автономные claws выполняют работу.
 
-Claw Code is not just a codebase. It is a public demonstration of what happens when:
+Claw Code — это не просто кодовая база. Это публичная демонстрация того, что происходит, когда:
 
-- a human provides clear direction,
-- multiple coding agents coordinate in parallel,
-- notification routing is pushed out of the agent context window,
-- planning, execution, review, and retry loops are automated,
-- and the human does **not** sit in a terminal micromanaging every step.
+- человек задает четкое направление,
+- несколько coding-агентов координируются параллельно,
+- маршрутизация уведомлений вынесена за пределы context window агента,
+- циклы планирования, исполнения, ревью и повторных попыток автоматизированы,
+- а человек **не** сидит в терминале, микроменеджируя каждый шаг.
 
-## The Human Interface Is Discord
+## Интерфейс для человека — это Discord
 
-The important interface here is not tmux, Vim, SSH, or a terminal multiplexer.
+Важный интерфейс здесь — не tmux, не Vim, не SSH и не терминальный мультиплексор.
 
-The real human interface is a Discord channel.
+Настоящий интерфейс для человека — это канал в Discord.
 
-A person can type a sentence from a phone, walk away, sleep, or do something else. The claws read the directive, break it into tasks, assign roles, write code, run tests, argue over failures, recover, and push when the work passes.
+Человек может отправить одну фразу с телефона, уйти, лечь спать или заняться чем-то другим. Claws прочитают директиву, разобьют ее на задачи, распределят роли, напишут код, прогонят тесты, разберут сбои, восстановятся и запушат результат, когда работа пройдет проверки.
 
-That is the philosophy: **humans set direction; claws perform the labor.**
+В этом и состоит философия: **люди задают направление; claws выполняют работу.**
 
-## The Three-Part System
+## Система из трех частей
 
 ### 1. OmX (`oh-my-codex`)
-[oh-my-codex](https://github.com/Yeachan-Heo/oh-my-codex) provides the workflow layer.
+[oh-my-codex](https://github.com/Yeachan-Heo/oh-my-codex) дает workflow-слой.
 
-It turns short directives into structured execution:
-- planning keywords
-- execution modes
-- persistent verification loops
-- parallel multi-agent workflows
+Он превращает короткие директивы в структурированное исполнение:
+- ключевые слова для планирования
+- режимы исполнения
+- устойчивые циклы верификации
+- параллельные multi-agent workflow
 
-This is the layer that converts a sentence into a repeatable work protocol.
+Именно этот слой преобразует одну фразу в повторяемый рабочий протокол.
 
 ### 2. clawhip
-[clawhip](https://github.com/Yeachan-Heo/clawhip) is the event and notification router.
+[clawhip](https://github.com/Yeachan-Heo/clawhip) — это маршрутизатор событий и уведомлений.
 
-It watches:
-- git commits
-- tmux sessions
-- GitHub issues and PRs
-- agent lifecycle events
-- channel delivery
+Он отслеживает:
+- git-коммиты
+- tmux-сессии
+- GitHub issues и PR
+- события жизненного цикла агентов
+- доставку в каналы
 
-Its job is to keep monitoring and delivery **outside** the coding agent's context window so the agents can stay focused on implementation instead of status formatting and notification routing.
+Его задача — держать мониторинг и доставку **вне** context window coding-агента, чтобы агенты оставались сфокусированными на реализации, а не на форматировании статусов и рассылке уведомлений.
 
 ### 3. OmO (`oh-my-openagent`)
-[oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) handles multi-agent coordination.
+[oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) отвечает за координацию между несколькими агентами.
 
-This is where planning, handoffs, disagreement resolution, and verification loops happen across agents.
+Здесь происходят планирование, handoff, разрешение разногласий и циклы верификации между агентами.
 
-When Architect, Executor, and Reviewer disagree, OmO provides the structure for that loop to converge instead of collapse.
+Когда Architect, Executor и Reviewer расходятся во мнениях, OmO дает структуру, в которой этот цикл сходится, а не разваливается.
 
-## The Real Bottleneck Changed
+## Настоящее узкое место изменилось
 
-The bottleneck is no longer typing speed.
+Узкое место больше не в скорости печати.
 
-When agent systems can rebuild a codebase in hours, the scarce resource becomes:
-- architectural clarity
-- task decomposition
-- judgment
-- taste
-- conviction about what is worth building
-- knowing which parts can be parallelized and which parts must stay constrained
+Когда агентные системы могут пересобрать кодовую базу за часы, дефицитным ресурсом становятся:
+- архитектурная ясность
+- декомпозиция задач
+- суждение
+- вкус
+- убежденность в том, что вообще стоит строить
+- понимание, что можно распараллелить, а что должно оставаться ограниченным
 
-A fast agent team does not remove the need for thinking. It makes clear thinking even more valuable.
+Быстрая команда агентов не убирает необходимость думать. Она делает ясное мышление еще более ценным.
 
-## What Claw Code Demonstrates
+## Что демонстрирует Claw Code
 
-Claw Code demonstrates that a repository can be:
+Claw Code показывает, что репозиторий может быть:
 
-- **autonomously built in public**
-- coordinated by claws/lobsters rather than human pair-programming alone
-- operated through a chat interface
-- continuously improved by structured planning/execution/review loops
-- maintained as a showcase of the coordination layer, not just the output files
+- **автономно построен публично**
+- координироваться claws/lobsters, а не только человеческим pair-programming
+- управляться через чат-интерфейс
+- непрерывно улучшаться структурированными циклами планирования/исполнения/ревью
+- поддерживаться как витрина координационного слоя, а не только как набор выходных файлов
 
-The code is evidence.
-The coordination system is the product lesson.
+Код — это доказательство.
+Система координации — это главный продуктовый урок.
 
-## What Still Matters
+## Что по-прежнему важно
 
-As coding intelligence gets cheaper and more available, the durable differentiators are not raw coding output.
+По мере того как coding intelligence становится дешевле и доступнее, устойчивые отличия уже не лежат в сыром объеме кода.
 
-What still matters:
-- product taste
-- direction
-- system design
-- human trust
-- operational stability
-- judgment about what to build next
+Что по-прежнему важно:
+- продуктовый вкус
+- направление
+- дизайн системы
+- человеческое доверие
+- операционная стабильность
+- суждение о том, что строить дальше
 
-In that world, the job of the human is not to out-type the machine.
-The job of the human is to decide what deserves to exist.
+В этом мире задача человека — не печатать быстрее машины.
+Задача человека — решать, что заслуживает существования.
 
-## Short Version
+## Короткая версия
 
-**Claw Code is a demo of autonomous software development.**
+**Claw Code — это демонстрация автономной разработки ПО.**
 
-Humans provide direction.
-Claws coordinate, build, test, recover, and push.
-The repository is the artifact.
-The philosophy is the system behind it.
+Люди задают направление.
+Claws координируются, строят, тестируют, восстанавливаются и пушат.
+Репозиторий — это артефакт.
+Философия — это система, стоящая за ним.
 
-## Related explanation
+## Связанное объяснение
 
-For the longer public explanation behind this philosophy, see:
+Более длинное публичное объяснение этой философии:
 
 - https://x.com/realsigridjin/status/2039472968624185713

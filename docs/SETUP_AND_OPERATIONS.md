@@ -1,47 +1,47 @@
-# Claw Code Setup And Operations
+# Настройка и эксплуатация Claw Code
 
-This document is the canonical runbook for installation, startup, configuration, authentication, and operating modes in the current repository state.
+Этот документ — канонический runbook по установке, запуску, конфигурации, аутентификации и режимам работы в текущем состоянии репозитория.
 
-## Scope
+## Область охвата
 
-The active implementation lives in the Rust workspace under `rust/`.
+Активная реализация находится в Rust workspace `rust/`.
 
-Primary binaries:
+Основные бинарники:
 
-- `claw` — CLI and REPL runtime
-- `claw-web` — local browser UI over the same Rust runtime
+- `claw` — CLI и REPL runtime
+- `claw-web` — локальный браузерный UI поверх того же Rust runtime
 
-Primary support surfaces:
+Основные рабочие поверхности:
 
-- `.claw/sessions/` — per-workspace saved conversations
-- `$HOME/.claw/credentials.json` — saved OAuth credentials on local runs
-- mounted `/root/.claw/credentials.json` — saved OAuth credentials in Docker
-- `mock-anthropic-service` — deterministic local service for parity and test runs
+- `.claw/sessions/` — сохраненные диалоги в рамках workspace
+- `$HOME/.claw/credentials.json` — сохраненные OAuth credentials при локальном запуске
+- смонтированный `/root/.claw/credentials.json` — сохраненные OAuth credentials в Docker
+- `mock-anthropic-service` — детерминированный локальный сервис для parity и тестовых прогонов
 
-## Startup Matrix
+## Матрица запуска
 
-Use this matrix to choose the correct entrypoint.
+Используйте эту матрицу, чтобы выбрать правильный entrypoint.
 
-| Goal | Binary | Recommended auth | Recommended command |
+| Цель | Бинарник | Рекомендуемый auth | Рекомендуемая команда |
 | --- | --- | --- | --- |
-| Interactive terminal agent | `claw` | `ANTHROPIC_API_KEY` | `cargo run -p rusty-claude-cli --` |
-| One-shot scripted prompt | `claw` | `ANTHROPIC_API_KEY` | `cargo run -p rusty-claude-cli -- prompt "summarize this repository"` |
+| Интерактивный агент в терминале | `claw` | `ANTHROPIC_API_KEY` | `cargo run -p rusty-claude-cli --` |
+| Одноразовый prompt для скрипта | `claw` | `ANTHROPIC_API_KEY` | `cargo run -p rusty-claude-cli -- prompt "summarize this repository"` |
 | Browser UI | `claw-web` | `ANTHROPIC_API_KEY` | `cargo run -p web-api -- --cwd ..` |
-| OAuth credential bootstrap only | `claw login` | browser OAuth | `cargo run -p rusty-claude-cli -- login` |
-| Local deterministic test harness | `mock-anthropic-service` | none | `./scripts/run_mock_parity_harness.sh` |
+| Только bootstrap OAuth credentials | `claw login` | browser OAuth | `cargo run -p rusty-claude-cli -- login` |
+| Детерминированный локальный test harness | `mock-anthropic-service` | не требуется | `./scripts/run_mock_parity_harness.sh` |
 
-Important limitation:
+Важное ограничение:
 
-- Saved Claude OAuth credentials persist correctly.
-- Direct inference against `https://api.anthropic.com/v1/messages` still requires `ANTHROPIC_API_KEY`.
-- OAuth-only inference transport is not implemented in this repository yet.
-- If you point `ANTHROPIC_BASE_URL` at a compatible proxy that accepts bearer auth, saved OAuth or `ANTHROPIC_AUTH_TOKEN` may still be usable there.
+- Сохраненные Claude OAuth credentials сохраняются корректно.
+- Для прямого inference против `https://api.anthropic.com/v1/messages` по-прежнему требуется `ANTHROPIC_API_KEY`.
+- OAuth-only transport для inference в этом репозитории пока не реализован.
+- Если вы направите `ANTHROPIC_BASE_URL` на совместимый прокси, принимающий bearer auth, то сохраненный OAuth или `ANTHROPIC_AUTH_TOKEN` могут использоваться и там.
 
-## Local Setup
+## Локальная установка
 
-### 1. Install the Rust toolchain
+### 1. Установите Rust toolchain
 
-On macOS:
+Для macOS:
 
 ```bash
 xcode-select --install
@@ -51,16 +51,16 @@ rustup default stable
 rustup component add clippy rustfmt
 ```
 
-### 2. Build the workspace
+### 2. Соберите workspace
 
-From the repository root:
+Из корня репозитория:
 
 ```bash
 cd "$(git rev-parse --show-toplevel)/rust"
 cargo build --workspace
 ```
 
-### 3. Check available commands
+### 3. Проверьте доступные команды
 
 ```bash
 cd "$(git rev-parse --show-toplevel)/rust"
@@ -68,28 +68,28 @@ cd "$(git rev-parse --show-toplevel)/rust"
 ./target/debug/claw-web --help
 ```
 
-## Docker Setup
+## Установка и запуск через Docker
 
-The repository includes a top-level [Dockerfile](../Dockerfile). The image contains:
+В репозитории есть верхнеуровневый [Dockerfile](../Dockerfile). Образ включает:
 
-- Rust toolchain
+- инструментарий Rust
 - `cargo`
 - `clippy`
 - `rustfmt`
 - `git`
 - `python3`
 - `ripgrep`
-- installed `claw`
-- installed `claw-web`
+- установленный `claw`
+- установленный `claw-web`
 
-### Build the image
+### Сборка образа
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
 docker build -t claw-code .
 ```
 
-### Run the CLI in Docker
+### Запуск CLI в Docker
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
@@ -102,7 +102,7 @@ docker run --rm -it \
   claw-code
 ```
 
-### Run the web UI in Docker
+### Запуск web UI в Docker
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
@@ -122,11 +122,11 @@ docker run --rm -it \
   --cwd /workspace
 ```
 
-Open `http://localhost:8787`.
+После запуска откройте `http://localhost:8787`.
 
-### Docker OAuth bootstrap
+### Инициализация OAuth в Docker
 
-If you want to persist Claude OAuth credentials inside the Docker-mounted auth directory:
+Если вы хотите сохранить Claude OAuth credentials в Docker-mounted auth directory:
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
@@ -139,19 +139,19 @@ docker run --rm -it \
   claw-code login
 ```
 
-Notes:
+Примечания:
 
-- `-p 4545:4545` is required for the browser callback `http://localhost:4545/callback`.
-- For the default Anthropic direct API this OAuth login does not make inference ready by itself.
-- The saved credentials are still useful if you later use a compatible bearer-capable upstream via `ANTHROPIC_BASE_URL`.
+- `-p 4545:4545` обязателен для callback `http://localhost:4545/callback`.
+- Для стандартного direct API Anthropic этот OAuth-login сам по себе не делает runtime готовым к inference.
+- Сохраненные credentials все равно полезны, если позже использовать bearer-capable upstream через `ANTHROPIC_BASE_URL`.
 
-## Authentication Modes
+## Режимы аутентификации
 
-### Mode 1. `ANTHROPIC_API_KEY`
+### Режим 1. `ANTHROPIC_API_KEY`
 
-This is the standard working mode for direct Anthropic API access.
+Это стандартный рабочий режим для прямого доступа к Anthropic API.
 
-Local run:
+Локальный запуск:
 
 ```bash
 cd "$(git rev-parse --show-toplevel)/rust"
@@ -161,11 +161,11 @@ export ANTHROPIC_API_KEY
 ./target/debug/claw prompt "summarize this repository"
 ```
 
-### Mode 2. `ANTHROPIC_AUTH_TOKEN`
+### Режим 2. `ANTHROPIC_AUTH_TOKEN`
 
-This provides a bearer token from the environment.
+Этот режим использует bearer token из переменных окружения.
 
-Use it only when your configured upstream accepts bearer auth:
+Применяйте его только тогда, когда ваш upstream поддерживает bearer auth:
 
 ```bash
 cd "$(git rev-parse --show-toplevel)/rust"
@@ -176,14 +176,14 @@ export ANTHROPIC_BASE_URL="http://127.0.0.1:8080"
 ./target/debug/claw prompt "status"
 ```
 
-### Mode 3. Saved OAuth credentials
+### Режим 3. Сохраненные OAuth credentials
 
-`claw login` opens a browser OAuth flow and stores credentials in:
+`claw login` запускает браузерный OAuth flow и сохраняет credentials в:
 
-- local: `$HOME/.claw/credentials.json`
-- Docker: mounted `/root/.claw/credentials.json`
+- локально: `$HOME/.claw/credentials.json`
+- в Docker: смонтированный `/root/.claw/credentials.json`
 
-Commands:
+Команды:
 
 ```bash
 cd "$(git rev-parse --show-toplevel)/rust"
@@ -191,37 +191,37 @@ cd "$(git rev-parse --show-toplevel)/rust"
 ./target/debug/claw logout
 ```
 
-Current behavior:
+Текущее поведение:
 
-- OAuth credentials are saved and loaded correctly.
-- The web UI can display OAuth status.
-- Default direct inference to Anthropic still requires `ANTHROPIC_API_KEY`.
-- When only saved OAuth is present and the base URL is the default Anthropic API, the UI marks auth as not inference-ready and blocks sending.
+- OAuth credentials корректно сохраняются и загружаются.
+- Web UI умеет отображать OAuth status.
+- Для стандартного direct inference против Anthropic по-прежнему нужен `ANTHROPIC_API_KEY`.
+- Если доступен только saved OAuth и base URL указывает на стандартный Anthropic API, UI помечает auth как `not inference-ready` и блокирует отправку запросов.
 
-### Credential precedence
+### Приоритет источников credentials
 
-The active source resolves in this order:
+Активный источник определяется в таком порядке:
 
 1. `ANTHROPIC_API_KEY`
 2. `ANTHROPIC_AUTH_TOKEN`
-3. saved OAuth credentials
-4. no auth
+3. сохраненные OAuth credentials
+4. отсутствие auth
 
-Environment credentials override saved OAuth in both CLI and web modes.
+Переменные окружения имеют приоритет над сохраненным OAuth и в CLI, и в web UI.
 
-## Configuration
+## Конфигурация
 
-### Environment variables
+### Переменные окружения
 
-Supported operational variables:
+Поддерживаемые операционные переменные:
 
-- `ANTHROPIC_API_KEY` — direct Anthropic API key
-- `ANTHROPIC_AUTH_TOKEN` — bearer token for a compatible upstream
-- `ANTHROPIC_BASE_URL` — custom API base URL or proxy
+- `ANTHROPIC_API_KEY` — прямой API key Anthropic
+- `ANTHROPIC_AUTH_TOKEN` — bearer token для совместимого upstream
+- `ANTHROPIC_BASE_URL` — кастомный API base URL или прокси
 
-### Config file resolution
+### Порядок загрузки конфигурации
 
-Runtime config is loaded in this order, with later files overriding earlier ones:
+Runtime загружает конфигурацию в таком порядке, причем более поздние файлы переопределяют более ранние:
 
 1. `~/.claw.json`
 2. `~/.config/claw/settings.json`
@@ -229,20 +229,20 @@ Runtime config is loaded in this order, with later files overriding earlier ones
 4. `"$(git rev-parse --show-toplevel)/.claw/settings.json"`
 5. `"$(git rev-parse --show-toplevel)/.claw/settings.local.json"`
 
-Use `.claw/settings.local.json` only for machine-local overrides.
+Используйте `.claw/settings.local.json` только для локальных переопределений на конкретной машине.
 
-## Operating Modes
+## Режимы работы
 
-### 1. Interactive REPL
+### 1. Интерактивный REPL
 
-Best for long-lived interactive work with saved sessions.
+Лучший вариант для длительной интерактивной работы с сохранением сессий.
 
 ```bash
 cd "$(git rev-parse --show-toplevel)/rust"
 ./target/debug/claw
 ```
 
-You can also override the model on startup:
+Можно также сразу переопределить модель:
 
 ```bash
 cd "$(git rev-parse --show-toplevel)/rust"
@@ -250,9 +250,9 @@ cd "$(git rev-parse --show-toplevel)/rust"
 ./target/debug/claw --model claude-sonnet-4-6
 ```
 
-### 2. One-shot prompt mode
+### 2. Режим одноразового prompt
 
-Best for shell automation or a single answer.
+Лучший вариант для shell-автоматизации или одиночного ответа.
 
 ```bash
 cd "$(git rev-parse --show-toplevel)/rust"
@@ -260,18 +260,18 @@ cd "$(git rev-parse --show-toplevel)/rust"
 ./target/debug/claw "explain rust/crates/runtime/src/lib.rs"
 ```
 
-### 3. JSON automation mode
+### 3. JSON-режим для автоматизации
 
-Best for scripts, wrappers, and CI adapters.
+Лучший вариант для скриптов, оберток и CI-адаптеров.
 
 ```bash
 cd "$(git rev-parse --show-toplevel)/rust"
 ./target/debug/claw --output-format json prompt "status"
 ```
 
-### 4. Resume and maintenance mode
+### 4. Режим resume и обслуживания сессий
 
-Best for inspecting or maintaining a saved session without entering the REPL.
+Подходит для инспекции или обслуживания сохраненной сессии без входа в REPL.
 
 ```bash
 cd "$(git rev-parse --show-toplevel)/rust"
@@ -280,55 +280,55 @@ cd "$(git rev-parse --show-toplevel)/rust"
 ./target/debug/claw --resume latest /compact
 ```
 
-### 5. Browser UI mode
+### 5. Режим browser UI
 
-Best when you want a persistent local console in the browser with streaming text and tool events.
+Подходит, если нужен постоянный локальный браузерный интерфейс со streaming text и tool events.
 
-Local run:
+Локальный запуск:
 
 ```bash
 cd "$(git rev-parse --show-toplevel)/rust"
 cargo run -p web-api -- --cwd ..
 ```
 
-Features exposed in the current web UI:
+Текущие возможности web UI:
 
-- model input
-- permission mode selector
-- allowed tools field
-- enable/disable tool use for the current turn
-- session list
-- manual session refresh
-- new session creation
-- session compaction
-- OAuth status panel
-- SSE streaming over `/api/chat/stream`
+- поле модели
+- селектор режима прав
+- поле для списка разрешенных инструментов
+- включение/отключение tool use на текущий turn
+- список сессий
+- ручное обновление списка сессий
+- создание новой сессии
+- уплотнение текущей сессии
+- панель OAuth status
+- SSE-стриминг через `/api/chat/stream`
 
-### 6. Mock parity harness mode
+### 6. Режим mock parity harness
 
-Best for deterministic verification without talking to the live Anthropic API.
+Подходит для детерминированной проверки без обращения к live Anthropic API.
 
 ```bash
 cd "$(git rev-parse --show-toplevel)/rust"
 ./scripts/run_mock_parity_harness.sh
 ```
 
-Manual mock service:
+Ручной запуск mock-сервиса:
 
 ```bash
 cd "$(git rev-parse --show-toplevel)/rust"
 cargo run -p mock-anthropic-service -- --bind 127.0.0.1:0
 ```
 
-## Permission Modes
+## Режимы прав
 
-The runtime supports three permission modes:
+Runtime поддерживает три режима прав:
 
-- `read-only` — read/search tools only
-- `workspace-write` — can modify files under the workspace
-- `danger-full-access` — unrestricted local access
+- `read-only` — только чтение и поиск
+- `workspace-write` — можно изменять файлы внутри workspace
+- `danger-full-access` — неограниченный локальный доступ
 
-CLI examples:
+Примеры CLI:
 
 ```bash
 cd "$(git rev-parse --show-toplevel)/rust"
@@ -337,20 +337,20 @@ cd "$(git rev-parse --show-toplevel)/rust"
 ./target/debug/claw --permission-mode danger-full-access prompt "inspect and fix the failing tests"
 ```
 
-Web UI:
+В web UI:
 
-- the permission selector uses the same three values
-- the request is rejected if an unsupported permission mode is supplied
+- селектор использует те же три значения
+- запрос отвергается, если передан неподдерживаемый режим прав
 
-## Tool Modes
+## Режимы работы инструментов
 
-### All default tools enabled
+### Все стандартные инструменты включены
 
-Normal behavior unless you restrict them.
+Такое поведение используется по умолчанию, если вы не вводите ограничений.
 
-### Restricted tool set
+### Ограниченный набор инструментов
 
-Use `--allowedTools` in the CLI or `Allowed Tools` in the web UI.
+Используйте `--allowedTools` в CLI или поле `Allowed Tools` в web UI.
 
 CLI:
 
@@ -361,25 +361,25 @@ cd "$(git rev-parse --show-toplevel)/rust"
 
 Web UI:
 
-- type a comma-separated tool list such as `read,glob,grep`
-- clear the field to remove the restriction
+- вводите список через запятую, например `read,glob,grep`
+- очистите поле, чтобы убрать ограничение
 
-### Tool use disabled for a turn
+### Отключение tool use для turn
 
-Web UI only:
+Только в web UI:
 
-- uncheck `Enable tool use for this chat turn`
-- the turn will run as a pure model request without tool execution
+- снимите галочку `Enable tool use for this chat turn`
+- turn будет выполнен как чистый запрос к модели без запуска инструментов
 
-## Models
+## Модели
 
-Supported short aliases in the CLI:
+Поддерживаемые короткие alias в CLI:
 
 - `opus` -> `claude-opus-4-6`
 - `sonnet` -> `claude-sonnet-4-6`
 - `haiku` -> `claude-haiku-4-5-20251213`
 
-Equivalent CLI examples:
+Эквивалентные примеры CLI:
 
 ```bash
 cd "$(git rev-parse --show-toplevel)/rust"
@@ -387,32 +387,32 @@ cd "$(git rev-parse --show-toplevel)/rust"
 ./target/debug/claw --model claude-opus-4-6 prompt "review this diff"
 ```
 
-The web UI model field expects the full model identifier.
+В web UI поле модели ожидает полный идентификатор модели.
 
-## Sessions And Storage
+## Сессии и хранилище
 
-### Session storage
+### Хранилище сессий
 
-Saved conversations live under the current workspace:
+Сохраненные диалоги лежат внутри текущего workspace:
 
 - `"$(git rev-parse --show-toplevel)/.claw/sessions/"`
 
-The REPL auto-saves turns there.
+REPL автоматически сохраняет туда turn’ы.
 
-### Credential storage
+### Хранилище credentials
 
-Local runs:
+При локальном запуске:
 
 - `$HOME/.claw/credentials.json`
 
-Docker runs with the documented volume mount:
+При запуске в Docker с документированным volume mount:
 
-- `$HOME/.claw-docker/credentials.json` on the host
-- `/root/.claw/credentials.json` inside the container
+- `$HOME/.claw-docker/credentials.json` на хосте
+- `/root/.claw/credentials.json` внутри контейнера
 
-### Session commands
+### Команды для работы с сессиями
 
-Useful slash commands:
+Полезные slash-команды:
 
 - `/help`
 - `/status`
@@ -430,40 +430,40 @@ Useful slash commands:
 - `/mcp`
 - `/skills`
 
-## Web UI Controls
+## Элементы управления web UI
 
-The current [index.html](../rust/crates/web-api/static/index.html) exposes these controls:
+Текущий [index.html](../rust/crates/web-api/static/index.html) содержит следующие элементы:
 
-- `Login With Claude` — starts browser OAuth flow against the loopback callback
-- `Clear Saved OAuth` — removes persisted OAuth credentials
-- `Model` — full model ID
+- `Login With Claude` — запускает браузерный OAuth flow через loopback callback
+- `Clear Saved OAuth` — удаляет сохраненные OAuth credentials
+- `Model` — полный ID модели
 - `Permission Mode` — `danger-full-access`, `workspace-write`, `read-only`
-- `Allowed Tools` — comma-separated runtime tool allow-list
-- `Enable tool use for this chat turn` — disables tool execution for the current turn
-- `Refresh` — reloads saved sessions
-- `New` — starts a fresh local session
-- `Compact Current Session` — compacts the loaded session
-- `Send Prompt` — starts an SSE-backed streaming turn
+- `Allowed Tools` — allow-list runtime-инструментов через запятую
+- `Enable tool use for this chat turn` — отключает выполнение инструментов на текущем turn
+- `Refresh` — перечитывает сохраненные сессии
+- `New` — создает новую локальную сессию
+- `Compact Current Session` — выполняет compaction загруженной сессии
+- `Send Prompt` — запускает turn со streaming по SSE
 
-The web UI status areas show:
+Status-области web UI показывают:
 
-- auth source
-- whether auth is inference-ready
-- workspace root
-- runtime version
-- runtime date context
-- current session ID
-- per-message usage if present
+- активный источник auth
+- готовность auth к inference
+- корень workspace
+- версию runtime
+- контекст текущей даты runtime
+- текущий session ID
+- usage по сообщениям, если он есть
 
-## Troubleshooting
+## Устранение неполадок
 
 ### `invalid x-api-key`
 
-Cause:
+Причина:
 
-- `ANTHROPIC_API_KEY` is missing, empty, or invalid.
+- `ANTHROPIC_API_KEY` отсутствует, пустой или невалидный.
 
-Fix:
+Исправление:
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
@@ -474,24 +474,24 @@ export ANTHROPIC_API_KEY
 
 ### `OAuth authentication is currently not supported`
 
-Cause:
+Причина:
 
-- only saved OAuth is available
-- the runtime is still talking directly to the default Anthropic Messages API
+- доступен только сохраненный OAuth
+- runtime все еще ходит напрямую в стандартный Anthropic Messages API
 
-Fix:
+Исправление:
 
-- use `ANTHROPIC_API_KEY` for direct Anthropic access
-- or set `ANTHROPIC_BASE_URL` to a compatible upstream that supports bearer auth
+- используйте `ANTHROPIC_API_KEY` для прямого доступа к Anthropic
+- или задайте `ANTHROPIC_BASE_URL` на совместимый upstream, поддерживающий bearer auth
 
-### Browser callback resets on `http://localhost:4545/callback`
+### Браузерный callback сбрасывается на `http://localhost:4545/callback`
 
-Cause:
+Причина:
 
-- the callback port is not published from Docker
-- or an old container/image is still running
+- callback-порт не опубликован из Docker
+- или все еще работает старый контейнер / старый образ
 
-Fix:
+Исправление:
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
@@ -499,7 +499,7 @@ docker rm -f claw-web 2>/dev/null || true
 docker build -t claw-code .
 ```
 
-Then rerun the container with:
+Затем перезапустите контейнер:
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
@@ -513,35 +513,35 @@ docker run --rm -it \
   --cwd /workspace
 ```
 
-### Web UI says auth is saved, but `Send Prompt` is disabled
+### Web UI показывает, что auth сохранен, но `Send Prompt` недоступен
 
-Cause:
+Причина:
 
-- saved OAuth exists
-- direct default Anthropic inference is not supported through OAuth-only auth in this repository
+- сохраненный OAuth существует
+- direct inference через стандартный Anthropic не поддерживается в OAuth-only режиме в текущем состоянии репозитория
 
-Fix:
+Исправление:
 
-- launch with `ANTHROPIC_API_KEY`
-- or configure a bearer-capable upstream with `ANTHROPIC_BASE_URL`
+- запускайте с `ANTHROPIC_API_KEY`
+- или настройте bearer-capable upstream через `ANTHROPIC_BASE_URL`
 
-### Stale sessions or auth state in Docker
+### Застоявшееся состояние сессий или auth в Docker
 
-Clean the host-mounted auth state:
+Очистка host-mounted auth state:
 
 ```bash
 rm -f "$HOME/.claw-docker/credentials.json"
 ```
 
-Clean the local workspace sessions:
+Очистка локальных workspace-сессий:
 
 ```bash
 rm -rf "$(git rev-parse --show-toplevel)/.claw/sessions"
 ```
 
-## Verification
+## Проверка
 
-Run formatting, linting, and tests from the Rust workspace:
+Запускайте форматирование, линтер и тесты из Rust workspace:
 
 ```bash
 cd "$(git rev-parse --show-toplevel)/rust"
@@ -550,18 +550,18 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-When the full workspace test suite is too heavy for the current Docker memory limit, at minimum run:
+Если полный `cargo test --workspace` слишком тяжел для текущего лимита памяти Docker, то как минимум прогоните:
 
 ```bash
 cd "$(git rev-parse --show-toplevel)/rust"
 cargo test -p api -p web-api
 ```
 
-## Canonical Entry Points
+## Канонические entrypoint-документы
 
-Use these files as the current documentation entry points:
+Используйте следующие файлы как актуальные точки входа в документацию:
 
-- [README.md](../README.md) — repository overview
-- [USAGE.md](../USAGE.md) — concise quick-start guide
-- [SETUP_AND_OPERATIONS.md](./SETUP_AND_OPERATIONS.md) — detailed runbook
-- [rust/README.md](../rust/README.md) — Rust workspace overview
+- [README.md](../README.md) — обзор репозитория
+- [USAGE.md](../USAGE.md) — краткое практическое руководство
+- [SETUP_AND_OPERATIONS.md](./SETUP_AND_OPERATIONS.md) — подробный runbook
+- [rust/README.md](../rust/README.md) — обзор Rust workspace

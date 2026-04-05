@@ -1,7 +1,7 @@
-# Rewriting Project Claw Code
+# Переписывание проекта Claw Code
 
 <p align="center">
-  <strong>⭐ The fastest repo in history to surpass 50K stars, reaching the milestone in just 2 hours after publication ⭐</strong>
+  <strong>⭐ Самый быстрый репозиторий в истории, достигший 50K звезд: эта отметка была взята всего за 2 часа после публикации ⭐</strong>
 </p>
 
 <p align="center">
@@ -9,7 +9,7 @@
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=ultraworkers/claw-code&type=Date&theme=dark" />
       <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=ultraworkers/claw-code&type=Date" />
-      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=ultraworkers/claw-code&type=Date" width="600" />
+      <img alt="График истории звезд" src="https://api.star-history.com/svg?repos=ultraworkers/claw-code&type=Date" width="600" />
     </picture>
   </a>
 </p>
@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <strong>Autonomously maintained by lobsters/claws — not by human hands</strong>
+  <strong>Репозиторий автономно поддерживается lobsters/claws, а не человеческими руками</strong>
 </p>
 
 <p align="center">
@@ -27,57 +27,57 @@
   <a href="https://github.com/code-yeongyu/oh-my-openagent">oh-my-openagent</a> ·
   <a href="https://github.com/Yeachan-Heo/oh-my-claudecode">oh-my-claudecode</a> ·
   <a href="https://github.com/Yeachan-Heo/oh-my-codex">oh-my-codex</a> ·
-  <a href="https://discord.gg/6ztZB9jvWq">UltraWorkers Discord</a>
+  <a href="https://discord.gg/6ztZB9jvWq">Discord UltraWorkers</a>
 </p>
 
 > [!IMPORTANT]
-> The active Rust workspace now lives in [`rust/`](./rust). Start with [`USAGE.md`](./USAGE.md) for quick-start commands, then use [`docs/SETUP_AND_OPERATIONS.md`](./docs/SETUP_AND_OPERATIONS.md) for the full setup and operations runbook, and [`rust/README.md`](./rust/README.md) for crate-level details.
+> Активный Rust workspace теперь находится в [`rust/`](./rust). Начните с [`USAGE.md`](./USAGE.md), если нужны быстрые команды, затем откройте [`docs/SETUP_AND_OPERATIONS.md`](./docs/SETUP_AND_OPERATIONS.md) для полного runbook по установке и эксплуатации, а [`rust/README.md`](./rust/README.md) используйте для деталей по crate’ам.
 
-> Want the bigger idea behind this repo? Read [`PHILOSOPHY.md`](./PHILOSOPHY.md) and Sigrid Jin's public explanation: https://x.com/realsigridjin/status/2039472968624185713
+> Нужна более широкая идея, стоящая за этим репозиторием? Прочитайте [`PHILOSOPHY.md`](./PHILOSOPHY.md) и публичное объяснение Сигрид Джин: https://x.com/realsigridjin/status/2039472968624185713
 
-> Shout-out to the UltraWorkers ecosystem powering this repo: [clawhip](https://github.com/Yeachan-Heo/clawhip), [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent), [oh-my-claudecode](https://github.com/Yeachan-Heo/oh-my-claudecode), [oh-my-codex](https://github.com/Yeachan-Heo/oh-my-codex), and the [UltraWorkers Discord](https://discord.gg/6ztZB9jvWq).
+> Отдельное спасибо экосистеме UltraWorkers, которая двигает этот репозиторий: [clawhip](https://github.com/Yeachan-Heo/clawhip), [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent), [oh-my-claudecode](https://github.com/Yeachan-Heo/oh-my-claudecode), [oh-my-codex](https://github.com/Yeachan-Heo/oh-my-codex) и [Discord UltraWorkers](https://discord.gg/6ztZB9jvWq).
 
 ---
 
-## Backstory
+## Предыстория
 
-This repo is maintained by **lobsters/claws**, not by a conventional human-only dev team.
+Этот репозиторий поддерживается **lobsters/claws**, а не обычной командой, состоящей только из людей.
 
-The people behind the system are [Bellman / Yeachan Heo](https://github.com/Yeachan-Heo) and friends like [Yeongyu](https://github.com/code-yeongyu), but the repo itself is being pushed forward by autonomous claw workflows: parallel coding sessions, event-driven orchestration, recovery loops, and machine-readable lane state.
+За системой стоят [Bellman / Yeachan Heo](https://github.com/Yeachan-Heo) и его коллеги, например [Yeongyu](https://github.com/code-yeongyu), но сам репозиторий развивается через автономные claw-workflow: параллельные coding-сессии, событийную оркестрацию, recovery loops и машинно-читаемое состояние lane.
 
-In practice, that means this project is not just *about* coding agents — it is being **actively built by them**. Features, tests, telemetry, docs, and workflow hardening are landed through claw-driven loops using [clawhip](https://github.com/Yeachan-Heo/clawhip), [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent), [oh-my-claudecode](https://github.com/Yeachan-Heo/oh-my-claudecode), and [oh-my-codex](https://github.com/Yeachan-Heo/oh-my-codex).
+На практике это означает, что этот проект не просто *о* coding-агентах — он **активно строится ими**. Возможности, тесты, телеметрия, документация и hardening рабочих процессов вносятся через claw-driven loops с использованием [clawhip](https://github.com/Yeachan-Heo/clawhip), [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent), [oh-my-claudecode](https://github.com/Yeachan-Heo/oh-my-claudecode) и [oh-my-codex](https://github.com/Yeachan-Heo/oh-my-codex).
 
-This repository exists to prove that an open coding harness can be built **autonomously, in public, and at high velocity** — with humans setting direction and claws doing the grinding.
+Этот репозиторий существует как доказательство того, что открытый coding harness можно строить **автономно, публично и на высокой скорости** — когда люди задают направление, а claws выполняют тяжелую работу.
 
-See the public build story here:
+Публичная история сборки:
 
 https://x.com/realsigridjin/status/2039472968624185713
 
-![Tweet screenshot](assets/tweet-screenshot.png)
+![Скриншот твита](assets/tweet-screenshot.png)
 
 ---
 
-## Porting Status
+## Статус портирования
 
-The main source tree is now Python-first.
+Основное дерево исходников сейчас Python-first.
 
-- `src/` contains the active Python porting workspace
-- `tests/` verifies the current Python workspace
-- the exposed snapshot is no longer part of the tracked repository state
+- `src/` содержит активный Python-workspace для портирования
+- `tests/` проверяет текущее Python-workspace
+- открытый snapshot больше не является частью отслеживаемого состояния репозитория
 
-The current Python workspace is not yet a complete one-to-one replacement for the original system, but the primary implementation surface is now Python.
+Текущее Python-workspace пока не является полной one-to-one заменой исходной системы, но основной поверхностью реализации сейчас считается Python.
 
-## Why this rewrite exists
+## Зачем существует это переписывание
 
-I originally studied the exposed codebase to understand its harness, tool wiring, and agent workflow. After spending more time with the legal and ethical questions—and after reading the essay linked below—I did not want the exposed snapshot itself to remain the main tracked source tree.
+Изначально я изучал открытый код, чтобы понять harness, связку инструментов и агентный workflow. После более глубокого погружения в юридические и этические вопросы, а также после прочтения эссе по ссылке ниже, я не захотел, чтобы сам открытый snapshot оставался основным отслеживаемым исходным деревом.
 
-This repository now focuses on Python porting work instead.
+Теперь этот репозиторий сосредоточен на Python-портировании.
 
-## Repository Layout
+## Структура репозитория
 
 ```text
 .
-├── src/                                # Python porting workspace
+├── src/                                # Python-workspace для портирования
 │   ├── __init__.py
 │   ├── commands.py
 │   ├── main.py
@@ -86,100 +86,99 @@ This repository now focuses on Python porting work instead.
 │   ├── query_engine.py
 │   ├── task.py
 │   └── tools.py
-├── tests/                              # Python verification
-├── assets/omx/                         # OmX workflow screenshots
+├── tests/                              # Проверка Python-части
+├── assets/omx/                         # Скриншоты OmX workflow
 ├── 2026-03-09-is-legal-the-same-as-legitimate-ai-reimplementation-and-the-erosion-of-copyleft.md
 └── README.md
 ```
 
-## Python Workspace Overview
+## Обзор Python-workspace
 
-The new Python `src/` tree currently provides:
+Новая Python-ветка `src/` сейчас предоставляет:
 
-- **`port_manifest.py`** — summarizes the current Python workspace structure
-- **`models.py`** — dataclasses for subsystems, modules, and backlog state
-- **`commands.py`** — Python-side command port metadata
-- **`tools.py`** — Python-side tool port metadata
-- **`query_engine.py`** — renders a Python porting summary from the active workspace
-- **`main.py`** — a CLI entrypoint for manifest and summary output
+- **`port_manifest.py`** — сводку по текущей структуре Python-workspace
+- **`models.py`** — dataclass-модели для подсистем, модулей и состояния backlog
+- **`commands.py`** — Python-метаданные по портированию команд
+- **`tools.py`** — Python-метаданные по портированию инструментов
+- **`query_engine.py`** — формирование сводки по Python-портированию из активного workspace
+- **`main.py`** — CLI entrypoint для вывода manifest и summary
 
-## Quickstart
+## Быстрый старт
 
-Render the Python porting summary:
+Показать summary по Python-портированию:
 
 ```bash
 python3 -m src.main summary
 ```
 
-Print the current Python workspace manifest:
+Вывести manifest текущего Python-workspace:
 
 ```bash
 python3 -m src.main manifest
 ```
 
-List the current Python modules:
+Показать текущие Python-модули:
 
 ```bash
 python3 -m src.main subsystems --limit 16
 ```
 
-Run verification:
+Запустить проверку:
 
 ```bash
 python3 -m unittest discover -s tests -v
 ```
 
-Run the parity audit against the local ignored archive (when present):
+Запустить parity audit по локальному игнорируемому архиву, если он присутствует:
 
 ```bash
 python3 -m src.main parity-audit
 ```
 
-Inspect mirrored command/tool inventories:
+Просмотреть зеркальные inventory команд и инструментов:
 
 ```bash
 python3 -m src.main commands --limit 10
 python3 -m src.main tools --limit 10
 ```
 
-## Current Parity Checkpoint
+## Текущий parity-checkpoint
 
-The port now mirrors the archived root-entry file surface, top-level subsystem names, and command/tool inventories much more closely than before. However, it is **not yet** a full runtime-equivalent replacement for the original TypeScript system; the Python tree still contains fewer executable runtime slices than the archived source.
+Порт теперь намного точнее отражает поверхность архивного root-entry файла, имена верхнеуровневых подсистем и inventory команд/инструментов. Однако это **еще не** полноценная runtime-эквивалентная замена исходной TypeScript-системы; в Python-дереве по-прежнему меньше исполняемых runtime-срезов, чем в архивном исходнике.
 
+## Создано с помощью `oh-my-codex`
 
-## Built with `oh-my-codex`
+Реструктуризация и работа над документацией в этом репозитории выполнялись с AI-поддержкой и оркестрировались через [oh-my-codex (OmX)](https://github.com/Yeachan-Heo/oh-my-codex) Йечана Хо, поверх Codex.
 
-The restructuring and documentation work on this repository was AI-assisted and orchestrated with Yeachan Heo's [oh-my-codex (OmX)](https://github.com/Yeachan-Heo/oh-my-codex), layered on top of Codex.
+- **режим `$team`:** использовался для координированного параллельного ревью и архитектурной обратной связи
+- **режим `$ralph`:** использовался для устойчивого исполнения, проверки и дисциплины доведения до конца
+- **workflow на базе Codex:** использовался для превращения основного дерева `src/` в Python-first workspace для портирования
 
-- **`$team` mode:** used for coordinated parallel review and architectural feedback
-- **`$ralph` mode:** used for persistent execution, verification, and completion discipline
-- **Codex-driven workflow:** used to turn the main `src/` tree into a Python-first porting workspace
+### Скриншоты OmX workflow
 
-### OmX workflow screenshots
+![Скриншот OmX workflow 1](assets/omx/omx-readme-review-1.png)
 
-![OmX workflow screenshot 1](assets/omx/omx-readme-review-1.png)
+*Вид orchestration через Ralph/team во время ревью README и контекста эссе в терминальных панелях.*
 
-*Ralph/team orchestration view while the README and essay context were being reviewed in terminal panes.*
+![Скриншот OmX workflow 2](assets/omx/omx-readme-review-2.png)
 
-![OmX workflow screenshot 2](assets/omx/omx-readme-review-2.png)
+*Двухпанельный поток ревью и верификации во время финального прохода по формулировкам README.*
 
-*Split-pane review and verification flow during the final README wording pass.*
-
-## Community
+## Сообщество
 
 <p align="center">
-  <a href="https://discord.gg/6ztZB9jvWq"><img src="https://img.shields.io/badge/UltraWorkers-Discord-5865F2?logo=discord&style=for-the-badge" alt="UltraWorkers Discord" /></a>
+  <a href="https://discord.gg/6ztZB9jvWq"><img src="https://img.shields.io/badge/UltraWorkers-Discord-5865F2?logo=discord&style=for-the-badge" alt="Discord UltraWorkers" /></a>
 </p>
 
-Join the [**UltraWorkers Discord**](https://discord.gg/6ztZB9jvWq) — the community around clawhip, oh-my-openagent, oh-my-claudecode, oh-my-codex, and claw-code. Come chat about LLMs, harness engineering, agent workflows, and autonomous software development.
+Присоединяйтесь к [**Discord UltraWorkers**](https://discord.gg/6ztZB9jvWq) — это сообщество вокруг clawhip, oh-my-openagent, oh-my-claudecode, oh-my-codex и claw-code. Там обсуждают LLM, проектирование harness-систем, агентные workflow и автономную разработку ПО.
 
 [![Discord](https://img.shields.io/badge/Join%20Discord-UltraWorkers-5865F2?logo=discord&style=for-the-badge)](https://discord.gg/6ztZB9jvWq)
 
-## Star History
+## История звезд
 
-See the chart at the top of this README.
+Смотрите график в верхней части этого README.
 
-## Ownership / Affiliation Disclaimer
+## Дисклеймер по владению / аффилиации
 
-- This repository does **not** claim ownership of the original Claude Code source material.
-- This repository is **not affiliated with, endorsed by, or maintained by Anthropic**.
+- Этот репозиторий **не** заявляет права собственности на исходные материалы Claude Code.
+- Этот репозиторий **не аффилирован с Anthropic, не одобрен ею и не поддерживается ею**.

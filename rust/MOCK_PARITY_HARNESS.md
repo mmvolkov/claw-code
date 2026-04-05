@@ -1,16 +1,16 @@
-# Mock LLM parity harness
+# Стенд паритета на mock-сервисе для LLM
 
-This milestone adds a deterministic Anthropic-compatible mock service plus a reproducible CLI harness for the Rust `claw` binary.
+На этом этапе добавлены детерминированный mock-сервис, совместимый с Anthropic, и воспроизводимый CLI-harness для Rust-бинарника `claw`.
 
-## Artifacts
+## Артефакты
 
-- `crates/mock-anthropic-service/` — mock `/v1/messages` service
-- `crates/rusty-claude-cli/tests/mock_parity_harness.rs` — end-to-end clean-environment harness
-- `scripts/run_mock_parity_harness.sh` — convenience wrapper
+- `crates/mock-anthropic-service/` — mock-сервис `/v1/messages`
+- `crates/rusty-claude-cli/tests/mock_parity_harness.rs` — end-to-end harness в чистом окружении
+- `scripts/run_mock_parity_harness.sh` — удобная обертка для запуска
 
-## Scenarios
+## Сценарии
 
-The harness runs these scripted scenarios against a fresh workspace and isolated environment variables:
+Harness запускает следующие сценарии в свежем workspace и с изолированными переменными окружения:
 
 1. `streaming_text`
 2. `read_file_roundtrip`
@@ -23,27 +23,27 @@ The harness runs these scripted scenarios against a fresh workspace and isolated
 9. `bash_permission_prompt_denied`
 10. `plugin_tool_roundtrip`
 
-## Run
+## Запуск
 
 ```bash
 cd rust/
 ./scripts/run_mock_parity_harness.sh
 ```
 
-Behavioral checklist / parity diff:
+Поведенческий checklist / parity diff:
 
 ```bash
 cd rust/
 python3 scripts/run_mock_parity_diff.py
 ```
 
-Scenario-to-PARITY mappings live in `mock_parity_scenarios.json`.
+Связки между сценариями и `PARITY` хранятся в `mock_parity_scenarios.json`.
 
-## Manual mock server
+## Ручной запуск mock-сервера
 
 ```bash
 cd rust/
 cargo run -p mock-anthropic-service -- --bind 127.0.0.1:0
 ```
 
-The server prints `MOCK_ANTHROPIC_BASE_URL=...`; point `ANTHROPIC_BASE_URL` at that URL and use any non-empty `ANTHROPIC_API_KEY`.
+Сервер печатает `MOCK_ANTHROPIC_BASE_URL=...`; укажите этот URL в `ANTHROPIC_BASE_URL` и задайте любой непустой `ANTHROPIC_API_KEY`.
