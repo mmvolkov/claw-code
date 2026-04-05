@@ -24,6 +24,7 @@ const ALT_REQUEST_ID_HEADER: &str = "x-request-id";
 const DEFAULT_INITIAL_BACKOFF: Duration = Duration::from_millis(200);
 const DEFAULT_MAX_BACKOFF: Duration = Duration::from_secs(2);
 const DEFAULT_MAX_RETRIES: u32 = 2;
+const SAVED_OAUTH_DIRECT_API_UNSUPPORTED_MESSAGE: &str = "saved Claude OAuth credentials are present, but this runtime sends direct requests to https://api.anthropic.com/v1/messages, which requires ANTHROPIC_API_KEY. OAuth-only inference transport is not implemented here yet.";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AuthSource {
@@ -566,6 +567,23 @@ pub fn has_auth_from_env_or_saved() -> Result<bool, ApiError> {
         || load_saved_oauth_token()?.is_some())
 }
 
+pub fn saved_oauth_direct_api_warning_for_base_url(
+    base_url: &str,
+) -> Result<Option<String>, ApiError> {
+    if normalize_base_url(base_url) != normalize_base_url(DEFAULT_BASE_URL) {
+        return Ok(None);
+    }
+    if read_env_non_empty("ANTHROPIC_API_KEY")?.is_some()
+        || read_env_non_empty("ANTHROPIC_AUTH_TOKEN")?.is_some()
+    {
+        return Ok(None);
+    }
+    if load_saved_oauth_token()?.is_some() {
+        return Ok(Some(SAVED_OAUTH_DIRECT_API_UNSUPPORTED_MESSAGE.to_string()));
+    }
+    Ok(None)
+}
+
 pub fn resolve_startup_auth_source<F>(load_oauth_config: F) -> Result<AuthSource, ApiError>
 where
     F: FnOnce() -> Result<Option<OAuthConfig>, ApiError>,
@@ -700,6 +718,10 @@ fn read_auth_token() -> Option<String> {
 #[must_use]
 pub fn read_base_url() -> String {
     std::env::var("ANTHROPIC_BASE_URL").unwrap_or_else(|_| DEFAULT_BASE_URL.to_string())
+}
+
+fn normalize_base_url(value: &str) -> &str {
+    value.trim_end_matches('/')
 }
 
 fn request_id_from_headers(headers: &reqwest::header::HeaderMap) -> Option<String> {
@@ -851,7 +873,8 @@ mod tests {
 
     use super::{
         now_unix_timestamp, oauth_token_is_expired, resolve_saved_oauth_token,
-        resolve_startup_auth_source, AnthropicClient, AuthSource, OAuthTokenSet,
+        resolve_startup_auth_source, saved_oauth_direct_api_warning_for_base_url, AnthropicClient,
+        AuthSource, OAuthTokenSet, DEFAULT_BASE_URL,
     };
     use crate::types::{ContentBlockDelta, MessageRequest};
 
@@ -1103,6 +1126,58 @@ mod tests {
             .expect("stored token set");
         assert_eq!(stored.access_token, "expired-access-token");
         assert_eq!(stored.refresh_token.as_deref(), Some("refresh-token"));
+
+        clear_oauth_credentials().expect("clear credentials");
+        std::env::remove_var("CLAW_CONFIG_HOME");
+        cleanup_temp_config_home(&config_home);
+    }
+
+    #[test]
+    fn saved_oauth_direct_api_warning_is_emitted_for_default_base_url() {
+        let _guard = env_lock();
+        let config_home = temp_config_home();
+        std::env::set_var("CLAW_CONFIG_HOME", &config_home);
+        std::env::remove_var("ANTHROPIC_AUTH_TOKEN");
+        std::env::remove_var("ANTHROPIC_API_KEY");
+        save_oauth_credentials(&runtime::OAuthTokenSet {
+            access_token: "saved-access-token".to_string(),
+            refresh_token: Some("refresh".to_string()),
+            expires_at: Some(now_unix_timestamp() + 300),
+            scopes: vec!["scope:a".to_string()],
+        })
+        .expect("save oauth credentials");
+
+        let warning =
+            saved_oauth_direct_api_warning_for_base_url(DEFAULT_BASE_URL).expect("read warning");
+        assert!(warning
+            .expect("warning should exist")
+            .contains("requires ANTHROPIC_API_KEY"));
+
+        clear_oauth_credentials().expect("clear credentials");
+        std::env::remove_var("CLAW_CONFIG_HOME");
+        cleanup_temp_config_home(&config_home);
+    }
+
+    #[test]
+    fn saved_oauth_direct_api_warning_is_suppressed_for_custom_base_url() {
+        let _guard = env_lock();
+        let config_home = temp_config_home();
+        std::env::set_var("CLAW_CONFIG_HOME", &config_home);
+        std::env::remove_var("ANTHROPIC_AUTH_TOKEN");
+        std::env::remove_var("ANTHROPIC_API_KEY");
+        save_oauth_credentials(&runtime::OAuthTokenSet {
+            access_token: "saved-access-token".to_string(),
+            refresh_token: Some("refresh".to_string()),
+            expires_at: Some(now_unix_timestamp() + 300),
+            scopes: vec!["scope:a".to_string()],
+        })
+        .expect("save oauth credentials");
+
+        assert_eq!(
+            saved_oauth_direct_api_warning_for_base_url("https://proxy.example.test")
+                .expect("read warning"),
+            None
+        );
 
         clear_oauth_credentials().expect("clear credentials");
         std::env::remove_var("CLAW_CONFIG_HOME");

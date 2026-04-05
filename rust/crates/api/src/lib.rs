@@ -27,6 +27,7 @@ pub use types::{
     ToolChoice, ToolDefinition, ToolResultContentBlock, Usage,
 };
 
+pub use providers::anthropic::saved_oauth_direct_api_warning_for_base_url;
 pub use telemetry::{
     AnalyticsEvent, AnthropicRequestProfile, ClientIdentity, JsonlTelemetrySink,
     MemoryTelemetrySink, SessionTraceRecord, SessionTracer, TelemetryEvent, TelemetrySink,

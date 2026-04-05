@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::fs::{self, File};
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
+use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -8,6 +9,11 @@ use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 
 use crate::config::OAuthConfig;
+use crate::sandbox::detect_container_environment;
+
+pub const DEFAULT_OAUTH_CALLBACK_PORT: u16 = 4545;
+const LOCALHOST_CALLBACK_BIND_HOST: &str = "127.0.0.1";
+const CONTAINER_CALLBACK_BIND_HOST: &str = "0.0.0.0";
 
 /// Persisted OAuth access token bundle used by the CLI.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -262,6 +268,34 @@ pub fn loopback_redirect_uri(port: u16) -> String {
     format!("http://localhost:{port}/callback")
 }
 
+#[must_use]
+pub fn oauth_callback_port(config: &OAuthConfig) -> u16 {
+    config.callback_port.unwrap_or(DEFAULT_OAUTH_CALLBACK_PORT)
+}
+
+#[must_use]
+pub fn loopback_redirect_uri_for_config(config: &OAuthConfig) -> String {
+    loopback_redirect_uri(oauth_callback_port(config))
+}
+
+#[must_use]
+pub fn oauth_callback_bind_host() -> &'static str {
+    oauth_callback_bind_host_for(detect_container_environment().in_container)
+}
+
+#[must_use]
+pub const fn oauth_callback_bind_host_for(in_container: bool) -> &'static str {
+    if in_container {
+        CONTAINER_CALLBACK_BIND_HOST
+    } else {
+        LOCALHOST_CALLBACK_BIND_HOST
+    }
+}
+
+pub fn bind_oauth_callback_listener(port: u16) -> io::Result<TcpListener> {
+    TcpListener::bind((oauth_callback_bind_host(), port))
+}
+
 pub fn credentials_path() -> io::Result<PathBuf> {
     Ok(credentials_home_dir()?.join("credentials.json"))
 }
@@ -322,6 +356,85 @@ pub fn parse_oauth_callback_query(query: &str) -> Result<OAuthCallbackParams, St
         error: params.get("error").cloned(),
         error_description: params.get("error_description").cloned(),
     })
+}
+
+pub fn accept_oauth_callback(
+    listener: &TcpListener,
+) -> io::Result<(TcpStream, OAuthCallbackParams)> {
+    let (mut stream, _) = listener.accept()?;
+    let callback = read_oauth_callback(&mut stream)?;
+    Ok((stream, callback))
+}
+
+pub fn read_oauth_callback(stream: &mut TcpStream) -> io::Result<OAuthCallbackParams> {
+    let mut buffer = [0_u8; 4096];
+    let bytes_read = stream.read(&mut buffer)?;
+    let request = String::from_utf8_lossy(&buffer[..bytes_read]);
+    let request_line = request.lines().next().ok_or_else(|| {
+        io::Error::new(io::ErrorKind::InvalidData, "missing callback request line")
+    })?;
+    let target = request_line.split_whitespace().nth(1).ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            "missing callback request target",
+        )
+    })?;
+    parse_oauth_callback_request_target(target)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+}
+
+pub fn write_oauth_callback_response(
+    stream: &mut TcpStream,
+    content_type: &str,
+    body: &str,
+) -> io::Result<()> {
+    let response = format!(
+        "HTTP/1.1 200 OK\r\ncontent-type: {content_type}\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}",
+        body.len(),
+        body
+    );
+    stream.write_all(response.as_bytes())
+}
+
+pub fn complete_oauth_login<F, E>(
+    config: &OAuthConfig,
+    callback: OAuthCallbackParams,
+    expected_state: &str,
+    verifier: String,
+    redirect_uri: String,
+    exchange: F,
+) -> Result<OAuthTokenSet, String>
+where
+    F: FnOnce(&OAuthTokenExchangeRequest) -> Result<OAuthTokenSet, E>,
+    E: std::fmt::Display,
+{
+    if let Some(error) = callback.error {
+        let description = callback
+            .error_description
+            .unwrap_or_else(|| "authorization failed".to_string());
+        return Err(format!("{error}: {description}"));
+    }
+
+    let code = callback
+        .code
+        .ok_or_else(|| "callback did not include code".to_string())?;
+    let returned_state = callback
+        .state
+        .ok_or_else(|| "callback did not include state".to_string())?;
+    if returned_state != expected_state {
+        return Err("oauth state mismatch".to_string());
+    }
+
+    let request = OAuthTokenExchangeRequest::from_config(
+        config,
+        code,
+        expected_state,
+        verifier,
+        redirect_uri,
+    );
+    let token_set = exchange(&request).map_err(|error| error.to_string())?;
+    save_oauth_credentials(&token_set).map_err(|error| error.to_string())?;
+    Ok(token_set)
 }
 
 fn generate_random_token(bytes: usize) -> io::Result<String> {
@@ -458,10 +571,12 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::{
-        clear_oauth_credentials, code_challenge_s256, credentials_path, generate_pkce_pair,
-        generate_state, load_oauth_credentials, loopback_redirect_uri, parse_oauth_callback_query,
+        clear_oauth_credentials, code_challenge_s256, complete_oauth_login, credentials_path,
+        generate_pkce_pair, generate_state, load_oauth_credentials, loopback_redirect_uri,
+        loopback_redirect_uri_for_config, oauth_callback_bind_host_for, parse_oauth_callback_query,
         parse_oauth_callback_request_target, save_oauth_credentials, OAuthAuthorizationRequest,
-        OAuthConfig, OAuthRefreshRequest, OAuthTokenExchangeRequest, OAuthTokenSet,
+        OAuthCallbackParams, OAuthConfig, OAuthRefreshRequest, OAuthTokenExchangeRequest,
+        OAuthTokenSet, DEFAULT_OAUTH_CALLBACK_PORT,
     };
 
     fn sample_config() -> OAuthConfig {
@@ -592,5 +707,64 @@ mod tests {
         assert_eq!(params.code.as_deref(), Some("abc"));
         assert_eq!(params.state.as_deref(), Some("xyz"));
         assert!(parse_oauth_callback_request_target("/wrong?code=abc").is_err());
+    }
+
+    #[test]
+    fn oauth_bind_host_switches_inside_container() {
+        assert_eq!(oauth_callback_bind_host_for(false), "127.0.0.1");
+        assert_eq!(oauth_callback_bind_host_for(true), "0.0.0.0");
+    }
+
+    #[test]
+    fn loopback_redirect_uses_default_or_configured_port() {
+        let mut config = sample_config();
+        config.callback_port = None;
+        assert_eq!(
+            loopback_redirect_uri_for_config(&config),
+            loopback_redirect_uri(DEFAULT_OAUTH_CALLBACK_PORT)
+        );
+
+        config.callback_port = Some(56_789);
+        assert_eq!(
+            loopback_redirect_uri_for_config(&config),
+            "http://localhost:56789/callback"
+        );
+    }
+
+    #[test]
+    fn complete_oauth_login_saves_credentials() {
+        let _guard = env_lock();
+        let config_home = temp_config_home();
+        std::env::set_var("CLAW_CONFIG_HOME", &config_home);
+
+        let token_set = complete_oauth_login(
+            &sample_config(),
+            OAuthCallbackParams {
+                code: Some("auth-code".to_string()),
+                state: Some("expected-state".to_string()),
+                error: None,
+                error_description: None,
+            },
+            "expected-state",
+            "verifier".to_string(),
+            loopback_redirect_uri(4545),
+            |_request| {
+                Ok::<_, String>(OAuthTokenSet {
+                    access_token: "access-token".to_string(),
+                    refresh_token: Some("refresh-token".to_string()),
+                    expires_at: Some(42),
+                    scopes: vec!["scope:a".to_string()],
+                })
+            },
+        )
+        .expect("complete oauth login");
+
+        assert_eq!(
+            load_oauth_credentials().expect("load saved credentials"),
+            Some(token_set)
+        );
+
+        std::env::remove_var("CLAW_CONFIG_HOME");
+        std::fs::remove_dir_all(config_home).expect("cleanup temp dir");
     }
 }

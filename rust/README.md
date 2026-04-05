@@ -3,6 +3,7 @@
 A high-performance Rust rewrite of the Claw Code CLI agent harness. Built for speed, safety, and native tool execution.
 
 For a task-oriented guide with copy/paste examples, see [`../USAGE.md`](../USAGE.md).
+For the full runbook covering Docker, web UI, auth modes, configuration, sessions, and troubleshooting, see [`../docs/SETUP_AND_OPERATIONS.md`](../docs/SETUP_AND_OPERATIONS.md).
 
 ## Quick Start
 
@@ -29,9 +30,11 @@ cargo run -p rusty-claude-cli -- --output-format json prompt "summarize src/main
 Set your API credentials:
 
 ```bash
-export ANTHROPIC_API_KEY="sk-ant-..."
+read -s ANTHROPIC_API_KEY
+echo
+export ANTHROPIC_API_KEY
 # Or use a proxy
-export ANTHROPIC_BASE_URL="https://your-proxy.com"
+export ANTHROPIC_BASE_URL="http://127.0.0.1:8080"
 ```
 
 Or authenticate via OAuth and let the CLI persist credentials locally:
@@ -39,6 +42,12 @@ Or authenticate via OAuth and let the CLI persist credentials locally:
 ```bash
 cargo run -p rusty-claude-cli -- login
 ```
+
+Important current limitation:
+
+- saved Claude OAuth is persisted and loaded correctly
+- direct inference against the default Anthropic Messages API still requires `ANTHROPIC_API_KEY`
+- OAuth-only inference transport is not implemented in this repository yet
 
 ## Mock parity harness
 

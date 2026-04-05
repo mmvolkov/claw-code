@@ -1,0 +1,12 @@
+.git
+.github
+__pycache__/
+archive/
+.omx/
+.clawd-agents/
+.claude/sessions/
+.claude/settings.local.json
+assets/
+src/
+tests/
+rust/target/

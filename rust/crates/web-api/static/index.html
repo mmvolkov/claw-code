@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Claw Web</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="background">
+      <div class="background__glow background__glow--left"></div>
+      <div class="background__glow background__glow--right"></div>
+    </div>
+    <div class="shell">
+      <aside class="sidebar card">
+        <div class="brand">
+          <p class="brand__eyebrow">Claw Code</p>
+          <h1>Web Console</h1>
+          <p class="brand__copy">
+            Browser UI for the existing Rust runtime, sessions, tools, and Claude OAuth flow.
+          </p>
+        </div>
+
+        <section class="section">
+          <div class="section__header">
+            <h2>Auth</h2>
+            <span class="pill" id="auth-pill">Checking</span>
+          </div>
+          <p class="section__copy" id="auth-summary">
+            Inspecting available credentials and OAuth session state.
+          </p>
+          <div class="auth-actions">
+            <button class="button button--primary" id="login-button" type="button">
+              Login With Claude
+            </button>
+            <button class="button button--ghost" id="logout-button" type="button">
+              Clear Saved OAuth
+            </button>
+          </div>
+          <dl class="meta-list" id="auth-meta"></dl>
+        </section>
+
+        <section class="section">
+          <div class="section__header">
+            <h2>Controls</h2>
+            <span class="pill pill--muted" id="health-pill">Booting</span>
+          </div>
+          <label class="field">
+            <span>Model</span>
+            <input id="model-input" type="text" value="claude-opus-4-6" />
+          </label>
+          <label class="field">
+            <span>Permission Mode</span>
+            <select id="permission-select">
+              <option value="danger-full-access">danger-full-access</option>
+              <option value="workspace-write">workspace-write</option>
+              <option value="read-only">read-only</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Allowed Tools</span>
+            <textarea
+              id="allowed-tools-input"
+              rows="4"
+              placeholder="read,glob,grep"
+            ></textarea>
+          </label>
+          <label class="checkbox">
+            <input id="enable-tools-input" type="checkbox" checked />
+            <span>Enable tool use for this chat turn</span>
+          </label>
+          <dl class="meta-list" id="runtime-meta"></dl>
+        </section>
+
+        <section class="section section--grow">
+          <div class="section__header">
+            <h2>Sessions</h2>
+            <div class="session-actions">
+              <button class="button button--ghost button--small" id="refresh-sessions-button" type="button">
+                Refresh
+              </button>
+              <button class="button button--ghost button--small" id="new-session-button" type="button">
+                New
+              </button>
+            </div>
+          </div>
+          <div class="session-list" id="session-list"></div>
+        </section>
+      </aside>
+
+      <main class="main">
+        <section class="hero card">
+          <div>
+            <p class="brand__eyebrow">Workspace</p>
+            <h2 id="workspace-title">Loading runtime status</h2>
+            <p class="hero__copy" id="workspace-copy">
+              Starting the web shell and checking the local Claw runtime.
+            </p>
+          </div>
+          <div class="hero__status" id="request-status">Ready</div>
+        </section>
+
+        <section class="conversation card">
+          <div class="conversation__header">
+            <div>
+              <p class="brand__eyebrow">Conversation</p>
+              <h2 id="session-title">New session</h2>
+            </div>
+            <button class="button button--ghost button--small" id="compact-button" type="button">
+              Compact Current Session
+            </button>
+          </div>
+
+          <div class="flash" id="flash" hidden></div>
+
+          <div class="message-list" id="message-list">
+            <article class="message message--empty">
+              <p>No messages yet. Start with a prompt or load an existing session.</p>
+            </article>
+          </div>
+
+          <form class="composer" id="chat-form">
+            <label class="composer__field" for="prompt-input">
+              <span>Prompt</span>
+              <textarea
+                id="prompt-input"
+                rows="5"
+                placeholder="Summarize this repository and point out the most important runtime modules."
+                required
+              ></textarea>
+            </label>
+            <div class="composer__actions">
+              <div class="composer__hint" id="composer-hint">
+                The current session will auto-save under <code>.claw/sessions/</code>.
+              </div>
+              <button class="button button--primary button--large" id="send-button" type="submit">
+                Send Prompt
+              </button>
+            </div>
+          </form>
+        </section>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

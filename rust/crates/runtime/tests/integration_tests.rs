@@ -5,16 +5,16 @@
 
 use std::time::Duration;
 
-use runtime::green_contract::{GreenContract, GreenContractOutcome, GreenLevel};
+use runtime::green_contract::{GreenContract, GreenLevel};
 use runtime::{
     apply_policy, BranchFreshness, DiffScope, LaneBlocker, LaneContext, PolicyAction,
     PolicyCondition, PolicyEngine, PolicyRule, ReconcileReason, ReviewStatus, StaleBranchAction,
     StaleBranchPolicy,
 };
 
-/// stale_branch + policy_engine integration:
-/// When a branch is detected stale, does it correctly flow through
-/// PolicyCondition::StaleBranch to generate the expected action?
+// stale_branch + policy_engine integration:
+// When a branch is detected stale, does it correctly flow through
+// PolicyCondition::StaleBranch to generate the expected action?
 #[test]
 fn stale_branch_detection_flows_into_policy_engine() {
     // given — a stale branch context (2 hours behind main, threshold is 1 hour)
@@ -42,7 +42,7 @@ fn stale_branch_detection_flows_into_policy_engine() {
     assert_eq!(actions, vec![PolicyAction::MergeForward]);
 }
 
-/// stale_branch + policy_engine: Fresh branch does NOT trigger stale rules
+// stale_branch + policy_engine: Fresh branch does NOT trigger stale rules
 #[test]
 fn fresh_branch_does_not_trigger_stale_policy() {
     let fresh_context = LaneContext::new(
@@ -66,8 +66,8 @@ fn fresh_branch_does_not_trigger_stale_policy() {
     assert!(actions.is_empty());
 }
 
-/// green_contract + policy_engine integration:
-/// A lane that meets its green contract should be mergeable
+// green_contract + policy_engine integration:
+// A lane that meets its green contract should be mergeable
 #[test]
 fn green_contract_satisfied_allows_merge() {
     let contract = GreenContract::new(GreenLevel::Workspace);
@@ -81,8 +81,8 @@ fn green_contract_satisfied_allows_merge() {
     assert!(!insufficient);
 }
 
-/// green_contract + policy_engine:
-/// Lane with green level below contract requirement gets blocked
+// green_contract + policy_engine:
+// Lane with green level below contract requirement gets blocked
 #[test]
 fn green_contract_unsatisfied_blocks_merge() {
     let context = LaneContext::new(
@@ -109,8 +109,8 @@ fn green_contract_unsatisfied_blocks_merge() {
     assert!(actions.is_empty()); // level 1 < 3, so no merge
 }
 
-/// reconciliation + policy_engine integration:
-/// A reconciled lane should be handled by reconcile rules, not generic closeout
+// reconciliation + policy_engine integration:
+// A reconciled lane should be handled by reconcile rules, not generic closeout
 #[test]
 fn reconciled_lane_matches_reconcile_condition() {
     let context = LaneContext::reconciled("reconciled-lane");
@@ -146,7 +146,7 @@ fn reconciled_lane_matches_reconcile_condition() {
     );
 }
 
-/// stale_branch module: apply_policy generates correct actions
+// stale_branch module: apply_policy generates correct actions
 #[test]
 fn stale_branch_apply_policy_produces_rebase_action() {
     let stale = BranchFreshness::Stale {
@@ -182,7 +182,7 @@ fn stale_branch_apply_policy_warn_only() {
             assert!(message.contains("2 commit(s) behind main"));
             assert!(message.contains("fix-456"));
         }
-        _ => panic!("expected Warn action, got {:?}", action),
+        _ => panic!("expected Warn action, got {action:?}"),
     }
 }
 
@@ -193,7 +193,7 @@ fn stale_branch_fresh_produces_noop() {
     assert_eq!(action, StaleBranchAction::Noop);
 }
 
-/// Combined flow: stale detection + policy + action
+// Combined flow: stale detection + policy + action
 #[test]
 fn end_to_end_stale_lane_gets_merge_forward_action() {
     // Simulating what a harness would do:
@@ -255,7 +255,7 @@ fn end_to_end_stale_lane_gets_merge_forward_action() {
     );
 }
 
-/// Fresh branch with approved review should merge (not stale-blocked)
+// Fresh branch with approved review should merge (not stale-blocked)
 #[test]
 fn fresh_approved_lane_gets_merge_action() {
     let context = LaneContext::new(
@@ -283,14 +283,14 @@ fn fresh_approved_lane_gets_merge_action() {
     assert_eq!(actions, vec![PolicyAction::MergeToDev]);
 }
 
-/// worker_boot + recovery_recipes + policy_engine integration:
-/// When a session completes with a provider failure, does the worker
-/// status transition trigger the correct recovery recipe, and does
-/// the resulting recovery state feed into policy decisions?
+// worker_boot + recovery_recipes + policy_engine integration:
+// When a session completes with a provider failure, does the worker
+// status transition trigger the correct recovery recipe, and does
+// the resulting recovery state feed into policy decisions?
 #[test]
 fn worker_provider_failure_flows_through_recovery_to_policy() {
     use runtime::recovery_recipes::{
-        attempt_recovery, FailureScenario, RecoveryContext, RecoveryResult, RecoveryStep,
+        attempt_recovery, FailureScenario, RecoveryContext, RecoveryResult,
     };
     use runtime::worker_boot::{WorkerFailureKind, WorkerRegistry, WorkerStatus};
 

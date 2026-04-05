@@ -94,11 +94,14 @@ pub use mcp_stdio::{
     UnsupportedMcpServer,
 };
 pub use oauth::{
-    clear_oauth_credentials, code_challenge_s256, credentials_path, generate_pkce_pair,
-    generate_state, load_oauth_credentials, loopback_redirect_uri, parse_oauth_callback_query,
-    parse_oauth_callback_request_target, save_oauth_credentials, OAuthAuthorizationRequest,
-    OAuthCallbackParams, OAuthRefreshRequest, OAuthTokenExchangeRequest, OAuthTokenSet,
-    PkceChallengeMethod, PkceCodePair,
+    accept_oauth_callback, bind_oauth_callback_listener, clear_oauth_credentials,
+    code_challenge_s256, complete_oauth_login, credentials_path, generate_pkce_pair,
+    generate_state, load_oauth_credentials, loopback_redirect_uri,
+    loopback_redirect_uri_for_config, oauth_callback_bind_host, oauth_callback_bind_host_for,
+    oauth_callback_port, parse_oauth_callback_query, parse_oauth_callback_request_target,
+    read_oauth_callback, save_oauth_credentials, write_oauth_callback_response,
+    OAuthAuthorizationRequest, OAuthCallbackParams, OAuthRefreshRequest, OAuthTokenExchangeRequest,
+    OAuthTokenSet, PkceChallengeMethod, PkceCodePair, DEFAULT_OAUTH_CALLBACK_PORT,
 };
 pub use permissions::{
     PermissionContext, PermissionMode, PermissionOutcome, PermissionOverride, PermissionPolicy,

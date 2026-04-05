@@ -2,6 +2,8 @@
 
 This guide covers the current Rust workspace under `rust/` and the `claw` CLI binary.
 
+For the full runbook, use [docs/SETUP_AND_OPERATIONS.md](/Users/michaelvolkov/projects/claw-code/docs/SETUP_AND_OPERATIONS.md). This file stays focused on quick-start commands.
+
 ## Prerequisites
 
 - Rust toolchain with `cargo`
@@ -18,6 +20,81 @@ cargo build --workspace
 ```
 
 The CLI binary is available at `rust/target/debug/claw` after a debug build.
+
+## Run with Docker
+
+The repository now includes a top-level `Dockerfile` for running `claw` in a containerized dev environment.
+
+Build the image from the repository root:
+
+```bash
+cd /Users/michaelvolkov/projects/claw-code
+docker build -t claw-code .
+```
+
+Run the CLI interactively against the current repository mounted at `/workspace`:
+
+```bash
+cd /Users/michaelvolkov/projects/claw-code
+read -s ANTHROPIC_API_KEY
+echo
+
+docker run --rm -it \
+  -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
+  -v "$PWD":/workspace \
+  claw-code
+```
+
+Run a one-shot prompt:
+
+```bash
+cd /Users/michaelvolkov/projects/claw-code
+read -s ANTHROPIC_API_KEY
+echo
+
+docker run --rm -it \
+  -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
+  -v "$PWD":/workspace \
+  claw-code prompt "summarize this repository"
+```
+
+The image keeps the Rust toolchain, `git`, `python3`, and `rg` installed so the container can be used as a practical `claw` workspace rather than a binary-only wrapper.
+
+### Run the web interface
+
+The Rust workspace also includes a browser UI served by the new `claw-web` binary.
+
+Run it from the repository root:
+
+```bash
+cd /Users/michaelvolkov/projects/claw-code
+mkdir -p "$HOME/.claw-docker"
+
+docker run --rm -it \
+  -p 4545:4545 \
+  -p 8787:8787 \
+  -v "$PWD":/workspace \
+  -v "$HOME/.claw-docker:/root/.claw" \
+  --entrypoint claw-web \
+  claw-code \
+  --cwd /workspace
+```
+
+Then open `http://localhost:8787` in the browser.
+
+The web interface streams assistant deltas, tool activity, usage updates, and final turn completion over the `/api/chat/stream` SSE endpoint.
+
+If you want to use browser-based Claude OAuth from the web UI, do not pass `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` into the container, because environment credentials override saved OAuth tokens.
+Claw Web now completes OAuth through the same loopback callback as `claw login`: `http://localhost:4545/callback`.
+When running in Docker, the callback port must be published with `-p 4545:4545`, otherwise the browser cannot deliver the OAuth redirect back into the container.
+Saved Claude OAuth credentials are persisted correctly, but this runtime still sends direct requests to the Anthropic Messages API by default. For direct inference against `https://api.anthropic.com`, you still need `ANTHROPIC_API_KEY`; OAuth-only inference transport is not implemented in this project yet.
+
+For local non-Docker runs:
+
+```bash
+cd rust
+cargo run -p web-api -- --cwd ..
+```
 
 ## Quick start
 
@@ -76,7 +153,9 @@ Model aliases currently supported by the CLI:
 ### API key
 
 ```bash
-export ANTHROPIC_API_KEY="sk-ant-..."
+read -s ANTHROPIC_API_KEY
+echo
+export ANTHROPIC_API_KEY
 ```
 
 ### OAuth
