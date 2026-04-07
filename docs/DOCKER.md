@@ -11,8 +11,17 @@
 
 ## Сборка образа
 
+Образ **не публикуется** в Docker Hub: перед любым `docker run ... claw-code` его нужно **один раз собрать** из корня репозитория (рядом с `Dockerfile`). Иначе Docker попытается скачать `claw-code` с регистра и выдаст `pull access denied`.
+
 ```bash
 cd "$(git rev-parse --show-toplevel)"
+docker build -t claw-code .
+```
+
+**Windows (PowerShell):**
+
+```powershell
+Set-Location (git rev-parse --show-toplevel)
 docker build -t claw-code .
 ```
 
@@ -110,6 +119,32 @@ docker run --rm -it \
   --entrypoint claw-web \
   claw-code \
   --cwd /workspace
+```
+
+**Windows (PowerShell)** — тот же сценарий из корня репозитория (образ уже собран: `docker build -t claw-code .`):
+
+```powershell
+Set-Location (git rev-parse --show-toplevel)
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claw-docker" | Out-Null
+docker rm -f claw-web 2>$null
+
+docker run --rm -it `
+  --name claw-web `
+  -p 8787:8787 `
+  -p 4545:4545 `
+  -v "${PWD}:/workspace" `
+  -v "$env:USERPROFILE\.claw-docker:/root/.claw" `
+  --entrypoint claw-web `
+  claw-code `
+  --cwd /workspace
+```
+
+**Windows (CMD)** — одной строкой после `cd` в каталог репозитория (образ уже собран: `docker build -t claw-code .`):
+
+```cmd
+if not exist "%USERPROFILE%\.claw-docker" mkdir "%USERPROFILE%\.claw-docker"
+docker rm -f claw-web 2>nul
+docker run --rm -it --name claw-web -p 8787:8787 -p 4545:4545 -v "%cd%:/workspace" -v "%USERPROFILE%\.claw-docker:/root/.claw" --entrypoint claw-web claw-code --cwd /workspace
 ```
 
 Откройте в браузере: **http://localhost:8787**
