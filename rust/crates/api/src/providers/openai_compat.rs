@@ -16,6 +16,9 @@ use super::{Provider, ProviderFuture};
 
 pub const DEFAULT_XAI_BASE_URL: &str = "https://api.x.ai/v1";
 pub const DEFAULT_OPENAI_BASE_URL: &str = "https://api.openai.com/v1";
+pub const DEFAULT_GEMINI_BASE_URL: &str = "https://generativelanguage.googleapis.com/v1beta/openai";
+pub const DEFAULT_DEEPSEEK_BASE_URL: &str = "https://api.deepseek.com";
+pub const DEFAULT_PERPLEXITY_BASE_URL: &str = "https://api.perplexity.ai";
 const REQUEST_ID_HEADER: &str = "request-id";
 const ALT_REQUEST_ID_HEADER: &str = "x-request-id";
 const DEFAULT_INITIAL_BACKOFF: Duration = Duration::from_millis(200);
@@ -32,6 +35,9 @@ pub struct OpenAiCompatConfig {
 
 const XAI_ENV_VARS: &[&str] = &["XAI_API_KEY"];
 const OPENAI_ENV_VARS: &[&str] = &["OPENAI_API_KEY"];
+const GEMINI_ENV_VARS: &[&str] = &["GEMINI_API_KEY"];
+const DEEPSEEK_ENV_VARS: &[&str] = &["DEEPSEEK_API_KEY"];
+const PERPLEXITY_ENV_VARS: &[&str] = &["PERPLEXITY_API_KEY"];
 
 impl OpenAiCompatConfig {
     #[must_use]
@@ -53,11 +59,45 @@ impl OpenAiCompatConfig {
             default_base_url: DEFAULT_OPENAI_BASE_URL,
         }
     }
+
+    #[must_use]
+    pub const fn gemini() -> Self {
+        Self {
+            provider_name: "Gemini",
+            api_key_env: "GEMINI_API_KEY",
+            base_url_env: "GEMINI_BASE_URL",
+            default_base_url: DEFAULT_GEMINI_BASE_URL,
+        }
+    }
+
+    #[must_use]
+    pub const fn deepseek() -> Self {
+        Self {
+            provider_name: "DeepSeek",
+            api_key_env: "DEEPSEEK_API_KEY",
+            base_url_env: "DEEPSEEK_BASE_URL",
+            default_base_url: DEFAULT_DEEPSEEK_BASE_URL,
+        }
+    }
+
+    #[must_use]
+    pub const fn perplexity() -> Self {
+        Self {
+            provider_name: "Perplexity",
+            api_key_env: "PERPLEXITY_API_KEY",
+            base_url_env: "PERPLEXITY_BASE_URL",
+            default_base_url: DEFAULT_PERPLEXITY_BASE_URL,
+        }
+    }
+
     #[must_use]
     pub fn credential_env_vars(self) -> &'static [&'static str] {
         match self.provider_name {
             "xAI" => XAI_ENV_VARS,
             "OpenAI" => OPENAI_ENV_VARS,
+            "Gemini" => GEMINI_ENV_VARS,
+            "DeepSeek" => DEEPSEEK_ENV_VARS,
+            "Perplexity" => PERPLEXITY_ENV_VARS,
             _ => &[],
         }
     }

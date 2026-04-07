@@ -1,7 +1,10 @@
 use std::ffi::OsString;
 use std::sync::{Mutex, OnceLock};
 
-use api::{read_xai_base_url, ApiError, AuthSource, ProviderClient, ProviderKind};
+use api::{
+    read_deepseek_base_url, read_gemini_base_url, read_openai_base_url, read_perplexity_base_url,
+    read_xai_base_url, ApiError, AuthSource, ProviderClient, ProviderKind, ProviderSelection,
+};
 
 #[test]
 fn provider_client_routes_grok_aliases_through_xai() {
@@ -11,6 +14,23 @@ fn provider_client_routes_grok_aliases_through_xai() {
     let client = ProviderClient::from_model("grok-mini").expect("grok alias should resolve");
 
     assert_eq!(client.provider_kind(), ProviderKind::Xai);
+}
+
+#[test]
+fn provider_client_uses_explicit_openai_selection_for_custom_models() {
+    let _lock = env_lock();
+    let _anthropic_api_key = EnvVarGuard::set("ANTHROPIC_API_KEY", None);
+    let _anthropic_auth_token = EnvVarGuard::set("ANTHROPIC_AUTH_TOKEN", None);
+    let _openai_api_key = EnvVarGuard::set("OPENAI_API_KEY", Some("openai-test-key"));
+
+    let client = ProviderClient::from_model_with_selection(
+        "local-qwen",
+        ProviderSelection::OpenAiCompatible,
+        None,
+    )
+    .expect("explicit OpenAI-compatible selection should build a client");
+
+    assert_eq!(client.provider_kind(), ProviderKind::OpenAi);
 }
 
 #[test]
@@ -51,6 +71,68 @@ fn read_xai_base_url_prefers_env_override() {
     let _xai_base_url = EnvVarGuard::set("XAI_BASE_URL", Some("https://example.xai.test/v1"));
 
     assert_eq!(read_xai_base_url(), "https://example.xai.test/v1");
+}
+
+#[test]
+fn read_openai_base_url_prefers_env_override() {
+    let _lock = env_lock();
+    let _openai_base_url =
+        EnvVarGuard::set("OPENAI_BASE_URL", Some("https://example-openai.local/v1"));
+
+    assert_eq!(read_openai_base_url(), "https://example-openai.local/v1");
+}
+
+#[test]
+fn explicit_provider_selection_supports_gemini_deepseek_and_perplexity() {
+    let _lock = env_lock();
+    let _gemini_api_key = EnvVarGuard::set("GEMINI_API_KEY", Some("gemini-test-key"));
+    let _deepseek_api_key = EnvVarGuard::set("DEEPSEEK_API_KEY", Some("deepseek-test-key"));
+    let _perplexity_api_key = EnvVarGuard::set("PERPLEXITY_API_KEY", Some("perplexity-test-key"));
+
+    let gemini = ProviderClient::from_model_with_selection(
+        "gemini-3-flash-preview",
+        ProviderSelection::Gemini,
+        None,
+    )
+    .expect("gemini provider should build");
+    let deepseek = ProviderClient::from_model_with_selection(
+        "deepseek-chat",
+        ProviderSelection::DeepSeek,
+        None,
+    )
+    .expect("deepseek provider should build");
+    let perplexity =
+        ProviderClient::from_model_with_selection("sonar-pro", ProviderSelection::Perplexity, None)
+            .expect("perplexity provider should build");
+
+    assert_eq!(gemini.provider_kind(), ProviderKind::Gemini);
+    assert_eq!(deepseek.provider_kind(), ProviderKind::DeepSeek);
+    assert_eq!(perplexity.provider_kind(), ProviderKind::Perplexity);
+}
+
+#[test]
+fn provider_specific_base_urls_prefer_env_override() {
+    let _lock = env_lock();
+    let _gemini_base_url = EnvVarGuard::set(
+        "GEMINI_BASE_URL",
+        Some("https://example-gemini.local/openai"),
+    );
+    let _deepseek_base_url =
+        EnvVarGuard::set("DEEPSEEK_BASE_URL", Some("https://example-deepseek.local"));
+    let _perplexity_base_url = EnvVarGuard::set(
+        "PERPLEXITY_BASE_URL",
+        Some("https://example-perplexity.local"),
+    );
+
+    assert_eq!(
+        read_gemini_base_url(),
+        "https://example-gemini.local/openai"
+    );
+    assert_eq!(read_deepseek_base_url(), "https://example-deepseek.local");
+    assert_eq!(
+        read_perplexity_base_url(),
+        "https://example-perplexity.local"
+    );
 }
 
 fn env_lock() -> std::sync::MutexGuard<'static, ()> {

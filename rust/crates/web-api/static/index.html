@@ -50,6 +50,26 @@
             <input id="model-input" type="text" value="claude-opus-4-6" />
           </label>
           <label class="field">
+            <span>Provider</span>
+            <select id="provider-select">
+              <option value="auto">auto</option>
+              <option value="anthropic">anthropic</option>
+              <option value="openai-compatible">openai-compatible</option>
+              <option value="xai">xai</option>
+              <option value="gemini">gemini</option>
+              <option value="deepseek">deepseek</option>
+              <option value="perplexity">perplexity</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>System Prompt</span>
+            <textarea
+              id="system-prompt-input"
+              rows="3"
+              placeholder="Optional instructions applied before each turn."
+            ></textarea>
+          </label>
+          <label class="field">
             <span>Permission Mode</span>
             <select id="permission-select">
               <option value="danger-full-access">danger-full-access</option>
@@ -113,31 +133,37 @@
 
           <div class="flash" id="flash" hidden></div>
 
-          <div class="message-list" id="message-list">
-            <article class="message message--empty">
-              <p>No messages yet. Start with a prompt or load an existing session.</p>
-            </article>
-          </div>
-
-          <form class="composer" id="chat-form">
-            <label class="composer__field" for="prompt-input">
-              <span>Prompt</span>
-              <textarea
-                id="prompt-input"
-                rows="5"
-                placeholder="Summarize this repository and point out the most important runtime modules."
-                required
-              ></textarea>
-            </label>
-            <div class="composer__actions">
-              <div class="composer__hint" id="composer-hint">
-                The current session will auto-save under <code>.claw/sessions/</code>.
+          <div class="dialog-stack">
+            <section class="dialog-pane dialog-pane--assistant">
+              <div class="dialog-pane__toolbar">
+                <div class="dialog-pane__meta" id="assistant-pane-meta">Waiting for a reply.</div>
               </div>
-              <button class="button button--primary button--large" id="send-button" type="submit">
-                Send Prompt
-              </button>
-            </div>
-          </form>
+              <div class="dialog-pane__body" id="assistant-pane">
+                <article class="message message--empty">
+                  <p>No assistant replies yet. Start with a prompt or load an existing session.</p>
+                </article>
+              </div>
+            </section>
+
+            <form class="composer dialog-pane dialog-pane--user" id="chat-form">
+              <label class="composer__field" for="prompt-input">
+                <textarea
+                  id="prompt-input"
+                  rows="1"
+                  placeholder="Summarize this repository and point out the most important runtime modules."
+                  required
+                ></textarea>
+              </label>
+              <div class="composer__actions">
+                <div class="composer__hint" id="composer-hint">
+                  The current session will auto-save under <code>.claw/sessions/</code>.
+                </div>
+                <button class="button button--primary button--large" id="send-button" type="submit">
+                  Send Prompt
+                </button>
+              </div>
+            </form>
+          </div>
         </section>
       </main>
     </div>

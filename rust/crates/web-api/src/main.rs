@@ -7,9 +7,10 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 
 use api::{
-    max_tokens_for_model, resolve_model_alias, resolve_startup_auth_source, AnthropicClient,
-    AuthSource, ContentBlockDelta, InputContentBlock, InputMessage, MessageRequest,
-    MessageResponse, OutputContentBlock, PromptCache, StreamEvent as ApiStreamEvent, ToolChoice,
+    default_model_for_provider_selection, max_tokens_for_model, resolve_model_alias,
+    resolve_startup_auth_source, AnthropicClient, AuthSource, ContentBlockDelta, InputContentBlock,
+    InputMessage, MessageRequest, MessageResponse, OutputContentBlock, PromptCache, ProviderClient,
+    ProviderKind, ProviderSelection, StreamEvent as ApiStreamEvent, ToolChoice,
     ToolResultContentBlock,
 };
 use axum::extract::{Path as AxumPath, State};
@@ -26,12 +27,12 @@ use runtime::session_control::{
 };
 use runtime::{
     bind_oauth_callback_listener, clear_oauth_credentials, compact_session, complete_oauth_login,
-    credentials_path, format_usd, generate_pkce_pair, generate_state, load_oauth_credentials,
-    write_oauth_callback_response, ApiClient, ApiRequest, AssistantEvent, CompactionConfig,
-    ConfigLoader, ContentBlock, ConversationMessage, ConversationRuntime, MessageRole,
-    OAuthAuthorizationRequest, OAuthCallbackParams, OAuthConfig, PermissionMode, PermissionPolicy,
-    PromptCacheEvent, ResolvedPermissionMode, RuntimeError, Session, TokenUsage, ToolError,
-    ToolExecutor, UsageTracker,
+    credentials_path, format_usd, generate_pkce_pair, generate_state, load_dotenv_for,
+    load_oauth_credentials, write_oauth_callback_response, ApiClient, ApiRequest, AssistantEvent,
+    CompactionConfig, ConfigLoader, ContentBlock, ConversationMessage, ConversationRuntime,
+    MessageRole, OAuthAuthorizationRequest, OAuthCallbackParams, OAuthConfig, PermissionMode,
+    PermissionPolicy, PromptCacheEvent, ResolvedPermissionMode, RuntimeError, Session, TokenUsage,
+    ToolError, ToolExecutor, UsageTracker,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -50,6 +51,7 @@ const DEFAULT_CONTAINER_HOST: &str = "0.0.0.0";
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().skip(1).collect();
     let config = ServerConfig::from_args(&args)?;
+    load_dotenv_for(&config.workspace_root)?;
     let listener = TokioTcpListener::bind(config.socket_addr()?).await?;
     let state = AppState::new(config.clone());
 
@@ -295,6 +297,13 @@ struct HealthResponse {
     version: &'static str,
     workspace_root: String,
     date: String,
+    anthropic_default_model: String,
+    openai_default_model: Option<String>,
+    xai_default_model: String,
+    gemini_default_model: String,
+    deepseek_default_model: String,
+    perplexity_default_model: String,
+    default_system_prompt: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -305,6 +314,17 @@ struct AuthStatusResponse {
     active_source: &'static str,
     env_api_key: bool,
     env_bearer_token: bool,
+    env_openai_api_key: bool,
+    env_xai_api_key: bool,
+    env_gemini_api_key: bool,
+    env_deepseek_api_key: bool,
+    env_perplexity_api_key: bool,
+    anthropic_inference_ready: bool,
+    openai_inference_ready: bool,
+    xai_inference_ready: bool,
+    gemini_inference_ready: bool,
+    deepseek_inference_ready: bool,
+    perplexity_inference_ready: bool,
     saved_oauth: bool,
     saved_oauth_expired: bool,
     expires_at: Option<u64>,
@@ -392,11 +412,15 @@ struct ChatRequest {
     #[serde(default)]
     model: Option<String>,
     #[serde(default)]
+    provider: Option<String>,
+    #[serde(default)]
     permission_mode: Option<String>,
     #[serde(default)]
     allowed_tools: Vec<String>,
     #[serde(default)]
     enable_tools: Option<bool>,
+    #[serde(default)]
+    system_prompt: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -422,6 +446,7 @@ struct PromptCacheEventResponse {
 struct StreamTurnStarted {
     session_id: String,
     model: String,
+    provider: String,
     permission_mode: String,
     enable_tools: bool,
 }
@@ -486,6 +511,7 @@ impl StreamEventSink {
         &self,
         session_id: &str,
         model: &str,
+        provider: ProviderKind,
         permission_mode: PermissionMode,
         enable_tools: bool,
     ) {
@@ -494,6 +520,7 @@ impl StreamEventSink {
             &StreamTurnStarted {
                 session_id: session_id.to_string(),
                 model: model.to_string(),
+                provider: provider.as_str().to_string(),
                 permission_mode: permission_mode.as_str().to_string(),
                 enable_tools,
             },
@@ -578,7 +605,7 @@ struct WebRuntimePluginState {
 
 struct WebRuntimeClient {
     runtime: tokio::runtime::Runtime,
-    client: AnthropicClient,
+    client: ProviderClient,
     model: String,
     enable_tools: bool,
     allowed_tools: Option<AllowedToolSet>,
@@ -589,10 +616,12 @@ struct WebRuntimeClient {
 type AllowedToolSet = BTreeSet<String>;
 
 impl WebRuntimeClient {
+    #[allow(clippy::too_many_arguments)]
     fn new(
         cwd: &Path,
         session_id: &str,
         model: String,
+        provider_selection: ProviderSelection,
         enable_tools: bool,
         allowed_tools: Option<AllowedToolSet>,
         tool_registry: GlobalToolRegistry,
@@ -602,8 +631,7 @@ impl WebRuntimeClient {
             runtime: tokio::runtime::Runtime::new().map_err(|error| {
                 AppError::internal(format!("failed to create tokio runtime: {error}"))
             })?,
-            client: AnthropicClient::from_auth(resolve_web_auth_source(cwd)?)
-                .with_base_url(api::read_base_url())
+            client: resolve_web_provider_client(cwd, &model, provider_selection)?
                 .with_prompt_cache(PromptCache::new(session_id)),
             model,
             enable_tools,
@@ -847,6 +875,25 @@ async fn health(State(state): State<AppState>) -> Json<HealthResponse> {
         version: env!("CARGO_PKG_VERSION"),
         workspace_root: state.workspace_root().display().to_string(),
         date: current_date_string(),
+        anthropic_default_model: default_model_for_provider_selection(ProviderSelection::Anthropic)
+            .unwrap_or_else(|| DEFAULT_MODEL.to_string()),
+        openai_default_model: default_model_for_provider_selection(
+            ProviderSelection::OpenAiCompatible,
+        ),
+        xai_default_model: default_model_for_provider_selection(ProviderSelection::Xai)
+            .unwrap_or_else(|| "grok-3".to_string()),
+        gemini_default_model: default_model_for_provider_selection(ProviderSelection::Gemini)
+            .unwrap_or_else(|| "gemini-3-flash-preview".to_string()),
+        deepseek_default_model: default_model_for_provider_selection(ProviderSelection::DeepSeek)
+            .unwrap_or_else(|| "deepseek-chat".to_string()),
+        perplexity_default_model: default_model_for_provider_selection(
+            ProviderSelection::Perplexity,
+        )
+        .unwrap_or_else(|| "sonar-pro".to_string()),
+        default_system_prompt: env::var("CLAW_SYSTEM_PROMPT")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty()),
     })
 }
 
@@ -950,7 +997,7 @@ fn complete_web_oauth_callback(
                 expires_at: token_set.expires_at,
                 scopes: token_set.scopes,
             })
-            .map_err(|error| error.to_string())
+            .map_err(|error: api::ApiError| error.to_string())
     })?;
     Ok(())
 }
@@ -1214,10 +1261,18 @@ fn execute_chat_request_with_plugins(
     let (handle, session, _created) =
         load_or_create_session(workspace_root, request.session_id.as_deref())?;
     let session_id = session.session_id.clone();
-    let model = resolve_model_alias(request.model.as_deref().unwrap_or(DEFAULT_MODEL));
+    let provider_selection = parse_provider_selection(request.provider.as_deref())?;
+    let model = resolve_requested_model(request.model.as_deref(), provider_selection)?;
+    let provider_kind = provider_selection.resolve_kind(&model);
     let enable_tools = request.enable_tools.unwrap_or(true);
     if let Some(stream_sink) = &stream_sink {
-        stream_sink.turn_started(&session_id, &model, permission_mode, enable_tools);
+        stream_sink.turn_started(
+            &session_id,
+            &model,
+            provider_kind,
+            permission_mode,
+            enable_tools,
+        );
     }
     let system_prompt = runtime::load_system_prompt(
         workspace_root.to_path_buf(),
@@ -1226,6 +1281,7 @@ fn execute_chat_request_with_plugins(
         "unknown",
     )
     .map_err(|error| AppError::internal(format!("failed to build system prompt: {error}")))?;
+    let system_prompt = extend_system_prompt(system_prompt, request.system_prompt.as_deref());
 
     let mut runtime = ConversationRuntime::new_with_features(
         session,
@@ -1233,6 +1289,7 @@ fn execute_chat_request_with_plugins(
             workspace_root,
             &session_id,
             model.clone(),
+            provider_selection,
             enable_tools,
             allowed_tools.clone(),
             runtime_plugin_state.tool_registry.clone(),
@@ -1275,6 +1332,62 @@ fn execute_chat_request_with_plugins(
             .collect(),
         session: session_to_response(&handle.path, &session),
     })
+}
+
+fn parse_provider_selection(value: Option<&str>) -> AppResult<ProviderSelection> {
+    value
+        .map(ProviderSelection::parse)
+        .transpose()
+        .map_err(AppError::bad_request)?
+        .map_or(Ok(ProviderSelection::Auto), Ok)
+}
+
+fn resolve_requested_model(
+    requested_model: Option<&str>,
+    provider_selection: ProviderSelection,
+) -> AppResult<String> {
+    if let Some(model) = requested_model
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        return Ok(resolve_model_alias(model));
+    }
+
+    if let Some(default_model) = default_model_for_provider_selection(provider_selection) {
+        return Ok(resolve_model_alias(&default_model));
+    }
+
+    match provider_selection {
+        ProviderSelection::OpenAiCompatible => Err(AppError::bad_request(
+            "no model specified for openai-compatible provider; set OPENAI_MODEL or enter a model id in the UI",
+        )),
+        ProviderSelection::Xai => Err(AppError::bad_request(
+            "no model specified for xai provider; set XAI_MODEL or enter a model id in the UI",
+        )),
+        ProviderSelection::Gemini => Err(AppError::bad_request(
+            "no model specified for gemini provider; set GEMINI_MODEL or enter a model id in the UI",
+        )),
+        ProviderSelection::DeepSeek => Err(AppError::bad_request(
+            "no model specified for deepseek provider; set DEEPSEEK_MODEL or enter a model id in the UI",
+        )),
+        ProviderSelection::Perplexity => Err(AppError::bad_request(
+            "no model specified for perplexity provider; set PERPLEXITY_MODEL or enter a model id in the UI",
+        )),
+        ProviderSelection::Auto | ProviderSelection::Anthropic => Ok(DEFAULT_MODEL.to_string()),
+    }
+}
+
+fn extend_system_prompt(
+    mut base_prompt: Vec<String>,
+    custom_system_prompt: Option<&str>,
+) -> Vec<String> {
+    if let Some(custom) = custom_system_prompt
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        base_prompt.push(custom.to_string());
+    }
+    base_prompt
 }
 
 fn load_or_create_session(
@@ -1390,6 +1503,11 @@ fn default_oauth_config() -> OAuthConfig {
 fn read_auth_status() -> AppResult<AuthStatusResponse> {
     let env_api_key = env_non_empty("ANTHROPIC_API_KEY");
     let env_bearer_token = env_non_empty("ANTHROPIC_AUTH_TOKEN");
+    let env_openai_api_key = env_non_empty("OPENAI_API_KEY");
+    let env_xai_api_key = env_non_empty("XAI_API_KEY");
+    let env_gemini_api_key = env_non_empty("GEMINI_API_KEY");
+    let env_deepseek_api_key = env_non_empty("DEEPSEEK_API_KEY");
+    let env_perplexity_api_key = env_non_empty("PERPLEXITY_API_KEY");
     let base_url = api::read_base_url();
     let saved_oauth = load_oauth_credentials().map_err(|error| {
         AppError::internal(format!("failed to inspect OAuth credentials: {error}"))
@@ -1400,22 +1518,65 @@ fn read_auth_status() -> AppResult<AuthStatusResponse> {
         .as_ref()
         .and_then(|value| value.expires_at)
         .is_some_and(|expires_at| expires_at <= current_unix_timestamp());
-    let active_source = match (env_api_key, env_bearer_token, saved_oauth.is_some()) {
-        (true, true, _) => "api_key_and_bearer",
-        (true, false, _) => "api_key",
-        (false, true, _) => "bearer",
-        (false, false, true) => "oauth",
-        (false, false, false) => "none",
+    let anthropic_inference_ready = env_api_key
+        || env_bearer_token
+        || (saved_oauth.is_some() && !saved_oauth_expired && warning.is_none());
+    let openai_inference_ready = env_openai_api_key;
+    let xai_inference_ready = env_xai_api_key;
+    let gemini_inference_ready = env_gemini_api_key;
+    let deepseek_inference_ready = env_deepseek_api_key;
+    let perplexity_inference_ready = env_perplexity_api_key;
+    let active_source = match (
+        env_api_key,
+        env_bearer_token,
+        env_openai_api_key,
+        env_xai_api_key,
+        env_gemini_api_key,
+        env_deepseek_api_key,
+        env_perplexity_api_key,
+        saved_oauth.is_some(),
+    ) {
+        (true, true, _, _, _, _, _, _) => "api_key_and_bearer",
+        (true, false, _, _, _, _, _, _) => "api_key",
+        (false, true, _, _, _, _, _, _) => "bearer",
+        (false, false, true, _, _, _, _, _) => "openai_api_key",
+        (false, false, false, true, _, _, _, _) => "xai_api_key",
+        (false, false, false, false, true, _, _, _) => "gemini_api_key",
+        (false, false, false, false, false, true, _, _) => "deepseek_api_key",
+        (false, false, false, false, false, false, true, _) => "perplexity_api_key",
+        (false, false, false, false, false, false, false, true) => "oauth",
+        (false, false, false, false, false, false, false, false) => "none",
     };
 
     Ok(AuthStatusResponse {
-        authenticated: env_api_key || env_bearer_token || saved_oauth.is_some(),
-        inference_ready: env_api_key
+        authenticated: env_api_key
             || env_bearer_token
-            || (saved_oauth.is_some() && !saved_oauth_expired && warning.is_none()),
+            || env_openai_api_key
+            || env_xai_api_key
+            || env_gemini_api_key
+            || env_deepseek_api_key
+            || env_perplexity_api_key
+            || saved_oauth.is_some(),
+        inference_ready: anthropic_inference_ready
+            || openai_inference_ready
+            || xai_inference_ready
+            || gemini_inference_ready
+            || deepseek_inference_ready
+            || perplexity_inference_ready,
         active_source,
         env_api_key,
         env_bearer_token,
+        env_openai_api_key,
+        env_xai_api_key,
+        env_gemini_api_key,
+        env_deepseek_api_key,
+        env_perplexity_api_key,
+        anthropic_inference_ready,
+        openai_inference_ready,
+        xai_inference_ready,
+        gemini_inference_ready,
+        deepseek_inference_ready,
+        perplexity_inference_ready,
         saved_oauth: saved_oauth.is_some(),
         saved_oauth_expired,
         expires_at: saved_oauth.as_ref().and_then(|value| value.expires_at),
@@ -1425,6 +1586,18 @@ fn read_auth_status() -> AppResult<AuthStatusResponse> {
             .map(|path| path.display().to_string()),
         warning,
     })
+}
+
+fn resolve_web_provider_client(
+    cwd: &Path,
+    model: &str,
+    provider_selection: ProviderSelection,
+) -> AppResult<ProviderClient> {
+    let anthropic_auth = (provider_selection.resolve_kind(model) == ProviderKind::Anthropic)
+        .then(|| resolve_web_auth_source(cwd))
+        .transpose()?;
+    ProviderClient::from_model_with_selection(model, provider_selection, anthropic_auth)
+        .map_err(|error| AppError::unauthorized(error.to_string()))
 }
 
 fn resolve_web_auth_source(cwd: &Path) -> AppResult<AuthSource> {
@@ -1550,7 +1723,7 @@ fn push_output_block(
 }
 
 fn push_prompt_cache_record(
-    client: &AnthropicClient,
+    client: &ProviderClient,
     events: &mut Vec<AssistantEvent>,
     stream_sink: Option<&StreamEventSink>,
 ) {

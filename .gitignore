@@ -2,6 +2,9 @@ __pycache__/
 archive/
 .omx/
 .clawd-agents/
+.env
+.env.local
 # Claude Code local artifacts
 .claude/settings.local.json
 .claude/sessions/
+!.env.example

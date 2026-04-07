@@ -25,6 +25,7 @@
 | Цель | Бинарник | Рекомендуемый auth | Рекомендуемая команда |
 | --- | --- | --- | --- |
 | Интерактивный агент в терминале | `claw` | `ANTHROPIC_API_KEY` | `cargo run -p rusty-claude-cli --` |
+| Интерактивный агент с локальной OpenAI-compatible LLM | `claw` | `OPENAI_API_KEY` | `cargo run -p rusty-claude-cli -- --provider openai-compatible --model local-model` |
 | Одноразовый prompt для скрипта | `claw` | `ANTHROPIC_API_KEY` | `cargo run -p rusty-claude-cli -- prompt "summarize this repository"` |
 | Browser UI | `claw-web` | `ANTHROPIC_API_KEY` | `cargo run -p web-api -- --cwd ..` |
 | Только bootstrap OAuth credentials | `claw login` | browser OAuth | `cargo run -p rusty-claude-cli -- login` |
@@ -100,6 +101,18 @@ docker run --rm -it \
   -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
   -v "$PWD":/workspace \
   claw-code
+```
+
+Для локального OpenAI-compatible backend:
+
+```bash
+cd "$(git rev-parse --show-toplevel)"
+cp .env.example .env
+
+docker run --rm -it \
+  -v "$PWD":/workspace \
+  claw-code \
+  --provider openai-compatible
 ```
 
 ### Запуск web UI в Docker
@@ -198,14 +211,97 @@ cd "$(git rev-parse --show-toplevel)/rust"
 - Для стандартного direct inference против Anthropic по-прежнему нужен `ANTHROPIC_API_KEY`.
 - Если доступен только saved OAuth и base URL указывает на стандартный Anthropic API, UI помечает auth как `not inference-ready` и блокирует отправку запросов.
 
+### Режим 4. OpenAI-compatible backend
+
+Этот режим подходит для локальных LLM и любых upstream, совместимых с OpenAI `POST /v1/chat/completions`.
+
+Нужны переменные окружения:
+
+- `OPENAI_API_KEY`
+- опционально `OPENAI_BASE_URL`
+- опционально `OPENAI_MODEL`
+- опционально `CLAW_SYSTEM_PROMPT`
+
+CLI:
+
+```bash
+cd "$(git rev-parse --show-toplevel)/rust"
+./target/debug/claw --provider openai-compatible prompt "summarize this repository"
+```
+
+Web UI:
+
+- положите `OPENAI_API_KEY` и при необходимости `OPENAI_BASE_URL` в локальный `.env`
+- в левом блоке `Controls` выберите `Provider = openai-compatible`
+- в поле `Model` укажите model id вашего backend или задайте `OPENAI_MODEL`
+- в поле `System Prompt` задайте инструкции для конкретного диалога или положите дефолт в `CLAW_SYSTEM_PROMPT`
+
+Если одновременно присутствуют Anthropic credentials и локальный OpenAI-compatible backend, используйте явный `--provider openai-compatible` в CLI или selector `Provider` в web UI, чтобы не полагаться на `auto`.
+
+### Режим 4. `GEMINI_API_KEY`
+
+Этот режим использует Google Gemini через OpenAI-compatible transport.
+
+Нужны переменные окружения:
+
+- `GEMINI_API_KEY`
+- опционально `GEMINI_BASE_URL`
+- опционально `GEMINI_MODEL`
+
+CLI:
+
+```bash
+cd "$(git rev-parse --show-toplevel)/rust"
+./target/debug/claw --provider gemini prompt "summarize this repository"
+```
+
+### Режим 5. `DEEPSEEK_API_KEY`
+
+Этот режим использует DeepSeek через OpenAI-compatible transport.
+
+Нужны переменные окружения:
+
+- `DEEPSEEK_API_KEY`
+- опционально `DEEPSEEK_BASE_URL`
+- опционально `DEEPSEEK_MODEL`
+
+CLI:
+
+```bash
+cd "$(git rev-parse --show-toplevel)/rust"
+./target/debug/claw --provider deepseek prompt "summarize this repository"
+```
+
+### Режим 6. `PERPLEXITY_API_KEY`
+
+Этот режим использует Perplexity через OpenAI-compatible transport и endpoint `POST /chat/completions`.
+
+Нужны переменные окружения:
+
+- `PERPLEXITY_API_KEY`
+- опционально `PERPLEXITY_BASE_URL`
+- опционально `PERPLEXITY_MODEL`
+
+CLI:
+
+```bash
+cd "$(git rev-parse --show-toplevel)/rust"
+./target/debug/claw --provider perplexity prompt "Объясни разницу между REST и GraphQL в 5 пунктах."
+```
+
 ### Приоритет источников credentials
 
 Активный источник определяется в таком порядке:
 
 1. `ANTHROPIC_API_KEY`
 2. `ANTHROPIC_AUTH_TOKEN`
-3. сохраненные OAuth credentials
-4. отсутствие auth
+3. `OPENAI_API_KEY`
+4. `XAI_API_KEY`
+5. `GEMINI_API_KEY`
+6. `DEEPSEEK_API_KEY`
+7. `PERPLEXITY_API_KEY`
+8. сохраненные OAuth credentials
+9. отсутствие auth
 
 Переменные окружения имеют приоритет над сохраненным OAuth и в CLI, и в web UI.
 
@@ -218,6 +314,21 @@ cd "$(git rev-parse --show-toplevel)/rust"
 - `ANTHROPIC_API_KEY` — прямой API key Anthropic
 - `ANTHROPIC_AUTH_TOKEN` — bearer token для совместимого upstream
 - `ANTHROPIC_BASE_URL` — кастомный API base URL или прокси
+- `OPENAI_API_KEY` — credential для OpenAI-compatible backend
+- `OPENAI_BASE_URL` — base URL OpenAI-compatible backend
+- `OPENAI_MODEL` — provider-specific default model для OpenAI-compatible backend
+- `XAI_API_KEY` — credential для xAI backend
+- `XAI_BASE_URL` — base URL xAI backend
+- `GEMINI_API_KEY` — credential для Gemini backend
+- `GEMINI_BASE_URL` — base URL Gemini backend
+- `GEMINI_MODEL` — default model для Gemini
+- `DEEPSEEK_API_KEY` — credential для DeepSeek backend
+- `DEEPSEEK_BASE_URL` — base URL DeepSeek backend
+- `DEEPSEEK_MODEL` — default model для DeepSeek
+- `PERPLEXITY_API_KEY` — credential для Perplexity backend
+- `PERPLEXITY_BASE_URL` — base URL Perplexity backend
+- `PERPLEXITY_MODEL` — default model для Perplexity
+- `CLAW_SYSTEM_PROMPT` — общий системный промпт по умолчанию для CLI и Web UI
 
 ### Порядок загрузки конфигурации
 
@@ -248,6 +359,10 @@ cd "$(git rev-parse --show-toplevel)/rust"
 cd "$(git rev-parse --show-toplevel)/rust"
 ./target/debug/claw --model claude-opus-4-6
 ./target/debug/claw --model claude-sonnet-4-6
+./target/debug/claw --provider openai-compatible --model local-model
+./target/debug/claw --provider gemini
+./target/debug/claw --provider deepseek
+./target/debug/claw --provider perplexity
 ```
 
 ### 2. Режим одноразового prompt
@@ -319,6 +434,81 @@ cd "$(git rev-parse --show-toplevel)/rust"
 cd "$(git rev-parse --show-toplevel)/rust"
 cargo run -p mock-anthropic-service -- --bind 127.0.0.1:0
 ```
+
+## CLI против Web UI
+
+Ниже практическое сравнение двух основных способов работы с runtime.
+
+### Работа через CLI
+
+CLI — это самый прямой интерфейс к runtime.
+
+Типичный запуск с локальной OpenAI-compatible моделью:
+
+```bash
+cd "$(git rev-parse --show-toplevel)"
+
+docker run --rm -it \
+  -v "$PWD":/workspace \
+  claw-code \
+  --provider openai-compatible
+```
+
+Типичный рабочий цикл:
+
+1. Запустить REPL.
+2. Отправлять prompt напрямую из терминала.
+3. Менять состояние через slash-команды вроде `/model`, `/permissions`, `/session list`.
+4. Возвращаться к последней сессии через `claw --resume latest`.
+
+Преимущества CLI:
+
+- минимальная задержка и минимум лишнего интерфейса
+- хорошо подходит для shell-скриптов и повторяемых команд
+- есть JSON-режим для автоматизации
+- проще использовать в SSH, tmux, CI и удаленных окружениях
+
+### Работа через Web UI
+
+Web UI использует тот же runtime, но добавляет визуальный слой над сессиями, auth-status и streaming events.
+
+Типичный запуск:
+
+```bash
+cd "$(git rev-parse --show-toplevel)"
+mkdir -p "$HOME/.claw-docker"
+
+docker run --rm -it \
+  -p 8787:8787 \
+  -p 4545:4545 \
+  -v "$PWD":/workspace \
+  -v "$HOME/.claw-docker:/root/.claw" \
+  --entrypoint claw-web \
+  claw-code \
+  --cwd /workspace
+```
+
+Типичный рабочий цикл:
+
+1. Открыть `http://localhost:8787`.
+2. Выбрать `Provider`, `Model`, `Permission Mode`.
+3. При необходимости ограничить инструменты через `Allowed Tools`.
+4. Отправить prompt и наблюдать streaming text, tool use, tool result и usage.
+5. Переключаться между сессиями через список слева.
+
+Преимущества Web UI:
+
+- наглядный streaming-ответ в браузере
+- удобно видеть tool activity без чтения терминального потока
+- проще переключать provider и model интерактивно
+- удобнее вручную просматривать и продолжать сохраненные сессии
+
+### Что выбрать
+
+- Выбирайте CLI, если важны скорость, repeatability и интеграция со скриптами.
+- Выбирайте CLI, если работаете удаленно или в полностью терминальном окружении.
+- Выбирайте Web UI, если важны визуальный контроль, streaming events и быстрое интерактивное переключение настроек.
+- Выбирайте Web UI, если показываете систему другим людям или исследуете поведение инструментов вживую.
 
 ## Режимы прав
 
@@ -437,6 +627,7 @@ REPL автоматически сохраняет туда turn’ы.
 - `Login With Claude` — запускает браузерный OAuth flow через loopback callback
 - `Clear Saved OAuth` — удаляет сохраненные OAuth credentials
 - `Model` — полный ID модели
+- `Provider` — `auto`, `anthropic`, `openai-compatible`, `xai`
 - `Permission Mode` — `danger-full-access`, `workspace-write`, `read-only`
 - `Allowed Tools` — allow-list runtime-инструментов через запятую
 - `Enable tool use for this chat turn` — отключает выполнение инструментов на текущем turn

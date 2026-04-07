@@ -23,9 +23,11 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant, UNIX_EPOCH};
 
 use api::{
+    default_model_for_provider_selection, resolve_model_alias as api_resolve_model_alias,
     resolve_startup_auth_source, AnthropicClient, AuthSource, ContentBlockDelta, InputContentBlock,
-    InputMessage, MessageRequest, MessageResponse, OutputContentBlock, PromptCache,
-    StreamEvent as ApiStreamEvent, ToolChoice, ToolDefinition, ToolResultContentBlock,
+    InputMessage, MessageRequest, MessageResponse, OutputContentBlock, PromptCache, ProviderClient,
+    ProviderKind, ProviderSelection, StreamEvent as ApiStreamEvent, ToolChoice, ToolDefinition,
+    ToolResultContentBlock,
 };
 
 use commands::{
@@ -39,7 +41,7 @@ use plugins::{PluginHooks, PluginManager, PluginManagerConfig, PluginRegistry};
 use render::{MarkdownStreamState, Spinner, TerminalRenderer};
 use runtime::{
     bind_oauth_callback_listener, clear_oauth_credentials, complete_oauth_login, format_usd,
-    generate_pkce_pair, generate_state, load_system_prompt, pricing_for_model,
+    generate_pkce_pair, generate_state, load_dotenv_upwards, load_system_prompt, pricing_for_model,
     resolve_sandbox_status, write_oauth_callback_response, ApiClient, ApiRequest, AssistantEvent,
     CompactionConfig, ConfigLoader, ConfigSource, ContentBlock, ConversationMessage,
     ConversationRuntime, McpServerManager, McpTool, MessageRole, ModelPricing,
@@ -74,6 +76,8 @@ const CLI_OPTION_SUGGESTIONS: &[&str] = &[
     "--version",
     "-V",
     "--model",
+    "--provider",
+    "--system-prompt-text",
     "--output-format",
     "--permission-mode",
     "--dangerously-skip-permissions",
@@ -103,6 +107,8 @@ Run `claw --help` for usage."
 }
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
+    let cwd = env::current_dir()?;
+    let _ = load_dotenv_upwards(&cwd)?;
     let args: Vec<String> = env::args().skip(1).collect();
     match parse_args(&args)? {
         CliAction::DumpManifests => dump_manifests(),
@@ -124,19 +130,36 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         CliAction::Prompt {
             prompt,
             model,
+            provider_selection,
+            system_prompt_text,
             output_format,
             allowed_tools,
             permission_mode,
-        } => LiveCli::new(model, true, allowed_tools, permission_mode)?
-            .run_turn_with_output(&prompt, output_format)?,
+        } => LiveCli::new(
+            model,
+            provider_selection,
+            system_prompt_text.as_deref(),
+            true,
+            allowed_tools,
+            permission_mode,
+        )?
+        .run_turn_with_output(&prompt, output_format)?,
         CliAction::Login => run_login()?,
         CliAction::Logout => run_logout()?,
         CliAction::Init => run_init()?,
         CliAction::Repl {
             model,
+            provider_selection,
+            system_prompt_text,
             allowed_tools,
             permission_mode,
-        } => run_repl(model, allowed_tools, permission_mode)?,
+        } => run_repl(
+            model,
+            provider_selection,
+            system_prompt_text.as_deref(),
+            allowed_tools,
+            permission_mode,
+        )?,
         CliAction::Help => print_help(),
     }
     Ok(())
@@ -172,6 +195,8 @@ enum CliAction {
     Prompt {
         prompt: String,
         model: String,
+        provider_selection: ProviderSelection,
+        system_prompt_text: Option<String>,
         output_format: CliOutputFormat,
         allowed_tools: Option<AllowedToolSet>,
         permission_mode: PermissionMode,
@@ -181,6 +206,8 @@ enum CliAction {
     Init,
     Repl {
         model: String,
+        provider_selection: ProviderSelection,
+        system_prompt_text: Option<String>,
         allowed_tools: Option<AllowedToolSet>,
         permission_mode: PermissionMode,
     },
@@ -206,9 +233,52 @@ impl CliOutputFormat {
     }
 }
 
+fn resolve_requested_model(
+    model: String,
+    model_explicit: bool,
+    provider_selection: ProviderSelection,
+) -> Result<String, String> {
+    if model_explicit {
+        return Ok(model);
+    }
+
+    if let Some(default_model) = default_model_for_provider_selection(provider_selection) {
+        return Ok(resolve_model_alias(&default_model));
+    }
+
+    match provider_selection {
+        ProviderSelection::OpenAiCompatible => Err(
+            "no model specified for openai-compatible provider; pass --model or export OPENAI_MODEL"
+                .to_string(),
+        ),
+        ProviderSelection::Xai => {
+            Err("no model specified for xai provider; pass --model or export XAI_MODEL".to_string())
+        }
+        ProviderSelection::Gemini => Err(
+            "no model specified for gemini provider; pass --model or export GEMINI_MODEL"
+                .to_string(),
+        ),
+        ProviderSelection::DeepSeek => Err(
+            "no model specified for deepseek provider; pass --model or export DEEPSEEK_MODEL"
+                .to_string(),
+        ),
+        ProviderSelection::Perplexity => Err(
+            "no model specified for perplexity provider; pass --model or export PERPLEXITY_MODEL"
+                .to_string(),
+        ),
+        ProviderSelection::Auto | ProviderSelection::Anthropic => Ok(DEFAULT_MODEL.to_string()),
+    }
+}
+
 #[allow(clippy::too_many_lines)]
 fn parse_args(args: &[String]) -> Result<CliAction, String> {
     let mut model = DEFAULT_MODEL.to_string();
+    let mut model_explicit = false;
+    let mut provider_selection = ProviderSelection::Auto;
+    let mut system_prompt_text = env::var("CLAW_SYSTEM_PROMPT")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
     let mut output_format = CliOutputFormat::Text;
     let mut permission_mode_override = None;
     let mut wants_help = false;
@@ -231,11 +301,37 @@ fn parse_args(args: &[String]) -> Result<CliAction, String> {
                 let value = args
                     .get(index + 1)
                     .ok_or_else(|| "missing value for --model".to_string())?;
-                model = resolve_model_alias(value).to_string();
+                model = resolve_model_alias(value);
+                model_explicit = true;
                 index += 2;
             }
             flag if flag.starts_with("--model=") => {
-                model = resolve_model_alias(&flag[8..]).to_string();
+                model = resolve_model_alias(&flag[8..]);
+                model_explicit = true;
+                index += 1;
+            }
+            "--provider" => {
+                let value = args
+                    .get(index + 1)
+                    .ok_or_else(|| "missing value for --provider".to_string())?;
+                provider_selection = ProviderSelection::parse(value)?;
+                index += 2;
+            }
+            flag if flag.starts_with("--provider=") => {
+                provider_selection = ProviderSelection::parse(&flag[11..])?;
+                index += 1;
+            }
+            "--system-prompt-text" => {
+                let value = args
+                    .get(index + 1)
+                    .ok_or_else(|| "missing value for --system-prompt-text".to_string())?;
+                system_prompt_text =
+                    Some(value.trim().to_string()).filter(|value| !value.is_empty());
+                index += 2;
+            }
+            flag if flag.starts_with("--system-prompt-text=") => {
+                system_prompt_text =
+                    Some(flag[21..].trim().to_string()).filter(|value| !value.is_empty());
                 index += 1;
             }
             "--output-format" => {
@@ -272,7 +368,13 @@ fn parse_args(args: &[String]) -> Result<CliAction, String> {
                 }
                 return Ok(CliAction::Prompt {
                     prompt,
-                    model: resolve_model_alias(&model).to_string(),
+                    model: resolve_requested_model(
+                        model.clone(),
+                        model_explicit,
+                        provider_selection,
+                    )?,
+                    provider_selection,
+                    system_prompt_text,
                     output_format,
                     allowed_tools: normalize_allowed_tools(&allowed_tool_values)?,
                     permission_mode: permission_mode_override
@@ -327,11 +429,14 @@ fn parse_args(args: &[String]) -> Result<CliAction, String> {
     }
 
     let allowed_tools = normalize_allowed_tools(&allowed_tool_values)?;
+    let model = resolve_requested_model(model, model_explicit, provider_selection)?;
 
     if rest.is_empty() {
         let permission_mode = permission_mode_override.unwrap_or_else(default_permission_mode);
         return Ok(CliAction::Repl {
             model,
+            provider_selection,
+            system_prompt_text,
             allowed_tools,
             permission_mode,
         });
@@ -369,6 +474,8 @@ fn parse_args(args: &[String]) -> Result<CliAction, String> {
             Ok(CliAction::Prompt {
                 prompt,
                 model,
+                provider_selection,
+                system_prompt_text,
                 output_format,
                 allowed_tools,
                 permission_mode,
@@ -378,6 +485,8 @@ fn parse_args(args: &[String]) -> Result<CliAction, String> {
         _other => Ok(CliAction::Prompt {
             prompt: rest.join(" "),
             model,
+            provider_selection,
+            system_prompt_text,
             output_format,
             allowed_tools,
             permission_mode,
@@ -580,13 +689,8 @@ fn levenshtein_distance(left: &str, right: &str) -> usize {
     previous[right_chars.len()]
 }
 
-fn resolve_model_alias(model: &str) -> &str {
-    match model {
-        "opus" => "claude-opus-4-6",
-        "sonnet" => "claude-sonnet-4-6",
-        "haiku" => "claude-haiku-4-5-20251213",
-        _ => model,
-    }
+fn resolve_model_alias(model: &str) -> String {
+    api_resolve_model_alias(model)
 }
 
 fn normalize_allowed_tools(values: &[String]) -> Result<Option<AllowedToolSet>, String> {
@@ -838,7 +942,7 @@ fn run_login() -> Result<(), Box<dyn std::error::Error>> {
                     expires_at: token_set.expires_at,
                     scopes: token_set.scopes,
                 })
-                .map_err(|error| error.to_string())
+                .map_err(|error: api::ApiError| error.to_string())
         },
     ) {
         Ok(_) => {
@@ -1500,10 +1604,19 @@ fn run_resume_command(
 
 fn run_repl(
     model: String,
+    provider_selection: ProviderSelection,
+    system_prompt_text: Option<&str>,
     allowed_tools: Option<AllowedToolSet>,
     permission_mode: PermissionMode,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut cli = LiveCli::new(model, true, allowed_tools, permission_mode)?;
+    let mut cli = LiveCli::new(
+        model,
+        provider_selection,
+        system_prompt_text,
+        true,
+        allowed_tools,
+        permission_mode,
+    )?;
     let mut editor =
         input::LineEditor::new("> ", cli.repl_completion_candidates().unwrap_or_default());
     println!("{}", cli.startup_banner());
@@ -1565,6 +1678,7 @@ struct ManagedSessionSummary {
 
 struct LiveCli {
     model: String,
+    provider_selection: ProviderSelection,
     allowed_tools: Option<AllowedToolSet>,
     permission_mode: PermissionMode,
     system_prompt: Vec<String>,
@@ -1587,7 +1701,7 @@ struct RuntimeMcpState {
 }
 
 struct BuiltRuntime {
-    runtime: Option<ConversationRuntime<AnthropicRuntimeClient, CliToolExecutor>>,
+    runtime: Option<ConversationRuntime<ProviderRuntimeClient, CliToolExecutor>>,
     plugin_registry: PluginRegistry,
     plugins_active: bool,
     mcp_state: Option<Arc<Mutex<RuntimeMcpState>>>,
@@ -1596,7 +1710,7 @@ struct BuiltRuntime {
 
 impl BuiltRuntime {
     fn new(
-        runtime: ConversationRuntime<AnthropicRuntimeClient, CliToolExecutor>,
+        runtime: ConversationRuntime<ProviderRuntimeClient, CliToolExecutor>,
         plugin_registry: PluginRegistry,
         mcp_state: Option<Arc<Mutex<RuntimeMcpState>>>,
     ) -> Self {
@@ -1641,7 +1755,7 @@ impl BuiltRuntime {
 }
 
 impl Deref for BuiltRuntime {
-    type Target = ConversationRuntime<AnthropicRuntimeClient, CliToolExecutor>;
+    type Target = ConversationRuntime<ProviderRuntimeClient, CliToolExecutor>;
 
     fn deref(&self) -> &Self::Target {
         self.runtime
@@ -2052,17 +2166,20 @@ impl HookAbortMonitor {
 impl LiveCli {
     fn new(
         model: String,
+        provider_selection: ProviderSelection,
+        system_prompt_text: Option<&str>,
         enable_tools: bool,
         allowed_tools: Option<AllowedToolSet>,
         permission_mode: PermissionMode,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let system_prompt = build_system_prompt()?;
+        let system_prompt = build_system_prompt(system_prompt_text)?;
         let session_state = Session::new();
         let session = create_managed_session_handle(&session_state.session_id)?;
         let runtime = build_runtime(
             session_state.with_persistence_path(session.path.clone()),
             &session.id,
             model.clone(),
+            provider_selection,
             system_prompt.clone(),
             enable_tools,
             true,
@@ -2072,6 +2189,7 @@ impl LiveCli {
         )?;
         let cli = Self {
             model,
+            provider_selection,
             allowed_tools,
             permission_mode,
             system_prompt,
@@ -2109,6 +2227,7 @@ impl LiveCli {
 ╚██████╗███████╗██║  ██║╚███╔███╔╝\n\
  ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝\x1b[0m \x1b[38;5;208mCode\x1b[0m 🦞\n\n\
   \x1b[2mModel\x1b[0m            {}\n\
+  \x1b[2mProvider\x1b[0m         {}\n\
   \x1b[2mPermissions\x1b[0m      {}\n\
   \x1b[2mBranch\x1b[0m           {}\n\
   \x1b[2mWorkspace\x1b[0m        {}\n\
@@ -2117,6 +2236,7 @@ impl LiveCli {
   \x1b[2mAuto-save\x1b[0m        {}\n\n\
   Type \x1b[1m/help\x1b[0m for commands · \x1b[1m/status\x1b[0m for live context · \x1b[2m/resume latest\x1b[0m jumps back to the newest session · \x1b[1m/diff\x1b[0m then \x1b[1m/commit\x1b[0m to ship · \x1b[2mTab\x1b[0m for workflow completions · \x1b[2mShift+Enter\x1b[0m for newline",
             self.model,
+            self.provider_selection.as_str(),
             self.permission_mode.as_str(),
             git_branch,
             workspace,
@@ -2146,6 +2266,7 @@ impl LiveCli {
             self.runtime.session().clone(),
             &self.session.id,
             self.model.clone(),
+            self.provider_selection,
             self.system_prompt.clone(),
             true,
             emit_output,
@@ -2231,6 +2352,7 @@ impl LiveCli {
             json!({
                 "message": final_assistant_text(&summary),
                 "model": self.model,
+                "provider": self.provider_selection.as_str(),
                 "iterations": summary.iterations,
                 "auto_compaction": summary.auto_compaction.map(|event| json!({
                     "removed_messages": event.removed_message_count,
@@ -2462,7 +2584,7 @@ impl LiveCli {
             return Ok(false);
         };
 
-        let model = resolve_model_alias(&model).to_string();
+        let model = resolve_model_alias(&model);
 
         if model == self.model {
             println!(
@@ -2483,6 +2605,7 @@ impl LiveCli {
             session,
             &self.session.id,
             model.clone(),
+            self.provider_selection,
             self.system_prompt.clone(),
             true,
             true,
@@ -2529,6 +2652,7 @@ impl LiveCli {
             session,
             &self.session.id,
             self.model.clone(),
+            self.provider_selection,
             self.system_prompt.clone(),
             true,
             true,
@@ -2559,6 +2683,7 @@ impl LiveCli {
             session_state.with_persistence_path(self.session.path.clone()),
             &self.session.id,
             self.model.clone(),
+            self.provider_selection,
             self.system_prompt.clone(),
             true,
             true,
@@ -2601,6 +2726,7 @@ impl LiveCli {
             session,
             &handle.id,
             self.model.clone(),
+            self.provider_selection,
             self.system_prompt.clone(),
             true,
             true,
@@ -2698,6 +2824,7 @@ impl LiveCli {
                     session,
                     &handle.id,
                     self.model.clone(),
+                    self.provider_selection,
                     self.system_prompt.clone(),
                     true,
                     true,
@@ -2733,6 +2860,7 @@ impl LiveCli {
                     forked,
                     &handle.id,
                     self.model.clone(),
+                    self.provider_selection,
                     self.system_prompt.clone(),
                     true,
                     true,
@@ -2783,6 +2911,7 @@ impl LiveCli {
             self.runtime.session().clone(),
             &self.session.id,
             self.model.clone(),
+            self.provider_selection,
             self.system_prompt.clone(),
             true,
             true,
@@ -2803,6 +2932,7 @@ impl LiveCli {
             result.compacted_session,
             &self.session.id,
             self.model.clone(),
+            self.provider_selection,
             self.system_prompt.clone(),
             true,
             true,
@@ -2827,6 +2957,7 @@ impl LiveCli {
             session,
             &self.session.id,
             self.model.clone(),
+            self.provider_selection,
             self.system_prompt.clone(),
             enable_tools,
             false,
@@ -3877,13 +4008,22 @@ fn resolve_export_path(
     Ok(cwd.join(final_name))
 }
 
-fn build_system_prompt() -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    Ok(load_system_prompt(
+fn build_system_prompt(
+    appended_system_prompt: Option<&str>,
+) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let mut prompt = load_system_prompt(
         env::current_dir()?,
         DEFAULT_DATE,
         env::consts::OS,
         "unknown",
-    )?)
+    )?;
+    if let Some(custom) = appended_system_prompt
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        prompt.push(custom.to_string());
+    }
+    Ok(prompt)
 }
 
 fn build_runtime_plugin_state() -> Result<RuntimePluginState, Box<dyn std::error::Error>> {
@@ -4295,6 +4435,7 @@ fn build_runtime(
     session: Session,
     session_id: &str,
     model: String,
+    provider_selection: ProviderSelection,
     system_prompt: Vec<String>,
     enable_tools: bool,
     emit_output: bool,
@@ -4307,6 +4448,7 @@ fn build_runtime(
         session,
         session_id,
         model,
+        provider_selection,
         system_prompt,
         enable_tools,
         emit_output,
@@ -4323,6 +4465,7 @@ fn build_runtime_with_plugin_state(
     session: Session,
     session_id: &str,
     model: String,
+    provider_selection: ProviderSelection,
     system_prompt: Vec<String>,
     enable_tools: bool,
     emit_output: bool,
@@ -4342,9 +4485,10 @@ fn build_runtime_with_plugin_state(
         .map_err(std::io::Error::other)?;
     let mut runtime = ConversationRuntime::new_with_features(
         session,
-        AnthropicRuntimeClient::new(
+        ProviderRuntimeClient::new(
             session_id,
             model,
+            provider_selection,
             enable_tools,
             emit_output,
             allowed_tools.clone(),
@@ -4449,10 +4593,11 @@ impl runtime::PermissionPrompter for CliPermissionPrompter {
     }
 }
 
-struct AnthropicRuntimeClient {
+struct ProviderRuntimeClient {
     runtime: tokio::runtime::Runtime,
-    client: AnthropicClient,
+    client: ProviderClient,
     model: String,
+    provider_selection: ProviderSelection,
     enable_tools: bool,
     emit_output: bool,
     allowed_tools: Option<AllowedToolSet>,
@@ -4460,10 +4605,12 @@ struct AnthropicRuntimeClient {
     progress_reporter: Option<InternalPromptProgressReporter>,
 }
 
-impl AnthropicRuntimeClient {
+impl ProviderRuntimeClient {
+    #[allow(clippy::too_many_arguments)]
     fn new(
         session_id: &str,
         model: String,
+        provider_selection: ProviderSelection,
         enable_tools: bool,
         emit_output: bool,
         allowed_tools: Option<AllowedToolSet>,
@@ -4472,10 +4619,10 @@ impl AnthropicRuntimeClient {
     ) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self {
             runtime: tokio::runtime::Runtime::new()?,
-            client: AnthropicClient::from_auth(resolve_cli_auth_source()?)
-                .with_base_url(api::read_base_url())
+            client: resolve_cli_provider_client(&model, provider_selection)?
                 .with_prompt_cache(PromptCache::new(session_id)),
             model,
+            provider_selection,
             enable_tools,
             emit_output,
             allowed_tools,
@@ -4483,6 +4630,17 @@ impl AnthropicRuntimeClient {
             progress_reporter,
         })
     }
+}
+
+fn resolve_cli_provider_client(
+    model: &str,
+    provider_selection: ProviderSelection,
+) -> Result<ProviderClient, Box<dyn std::error::Error>> {
+    let anthropic_auth = (provider_selection.resolve_kind(model) == ProviderKind::Anthropic)
+        .then(resolve_cli_auth_source)
+        .transpose()?;
+    ProviderClient::from_model_with_selection(model, provider_selection, anthropic_auth)
+        .map_err(Into::into)
 }
 
 fn resolve_cli_auth_source() -> Result<AuthSource, Box<dyn std::error::Error>> {
@@ -4499,7 +4657,7 @@ fn resolve_cli_auth_source() -> Result<AuthSource, Box<dyn std::error::Error>> {
     })?)
 }
 
-impl ApiClient for AnthropicRuntimeClient {
+impl ApiClient for ProviderRuntimeClient {
     #[allow(clippy::too_many_lines)]
     fn stream(&mut self, request: ApiRequest) -> Result<Vec<AssistantEvent>, RuntimeError> {
         if let Some(progress_reporter) = &self.progress_reporter {
@@ -5281,7 +5439,7 @@ fn response_to_events(
     Ok(events)
 }
 
-fn push_prompt_cache_record(client: &AnthropicClient, events: &mut Vec<AssistantEvent>) {
+fn push_prompt_cache_record(client: &ProviderClient, events: &mut Vec<AssistantEvent>) {
     if let Some(record) = client.take_last_prompt_cache_record() {
         if let Some(event) = prompt_cache_record_to_runtime_event(record) {
             events.push(AssistantEvent::PromptCache(event));
@@ -5493,17 +5651,17 @@ fn print_help_to(out: &mut impl Write) -> io::Result<()> {
     writeln!(out, "Usage:")?;
     writeln!(
         out,
-        "  claw [--model MODEL] [--allowedTools TOOL[,TOOL...]]"
+        "  claw [--model MODEL] [--provider PROVIDER] [--system-prompt-text TEXT] [--allowedTools TOOL[,TOOL...]]"
     )?;
     writeln!(out, "      Start the interactive REPL")?;
     writeln!(
         out,
-        "  claw [--model MODEL] [--output-format text|json] prompt TEXT"
+        "  claw [--model MODEL] [--provider PROVIDER] [--system-prompt-text TEXT] [--output-format text|json] prompt TEXT"
     )?;
     writeln!(out, "      Send one prompt and exit")?;
     writeln!(
         out,
-        "  claw [--model MODEL] [--output-format text|json] TEXT"
+        "  claw [--model MODEL] [--provider PROVIDER] [--system-prompt-text TEXT] [--output-format text|json] TEXT"
     )?;
     writeln!(out, "      Shorthand non-interactive prompt mode")?;
     writeln!(
@@ -5539,6 +5697,14 @@ fn print_help_to(out: &mut impl Write) -> io::Result<()> {
     writeln!(
         out,
         "  --model MODEL              Override the active model"
+    )?;
+    writeln!(
+        out,
+        "  --provider PROVIDER        Select auto, anthropic, openai-compatible, xai, gemini, deepseek, or perplexity"
+    )?;
+    writeln!(
+        out,
+        "  --system-prompt-text TXT  Append custom system instructions for this run or REPL session"
     )?;
     writeln!(
         out,
@@ -5588,6 +5754,10 @@ fn print_help_to(out: &mut impl Write) -> io::Result<()> {
     writeln!(out, "  claw --model claude-opus \"summarize this repo\"")?;
     writeln!(
         out,
+        "  claw --provider openai-compatible --model local-model \"summarize this repo\""
+    )?;
+    writeln!(
+        out,
         "  claw --output-format json prompt \"explain src/main.rs\""
     )?;
     writeln!(
@@ -5630,8 +5800,8 @@ mod tests {
         resume_supported_slash_commands, run_resume_command,
         slash_command_completion_candidates_with_sessions, status_context, validate_no_args,
         write_mcp_server_fixture, CliAction, CliOutputFormat, CliToolExecutor, GitWorkspaceSummary,
-        InternalPromptProgressEvent, InternalPromptProgressState, LiveCli, SlashCommand,
-        StatusUsage, DEFAULT_MODEL,
+        InternalPromptProgressEvent, InternalPromptProgressState, LiveCli, ProviderSelection,
+        SlashCommand, StatusUsage, DEFAULT_MODEL,
     };
     use api::{MessageResponse, OutputContentBlock, Usage};
     use plugins::{
@@ -5761,10 +5931,13 @@ mod tests {
     fn defaults_to_repl_when_no_args() {
         let _guard = env_lock();
         std::env::remove_var("RUSTY_CLAUDE_PERMISSION_MODE");
+        std::env::remove_var("CLAW_SYSTEM_PROMPT");
         assert_eq!(
             parse_args(&[]).expect("args should parse"),
             CliAction::Repl {
                 model: DEFAULT_MODEL.to_string(),
+                provider_selection: ProviderSelection::Auto,
+                system_prompt_text: None,
                 allowed_tools: None,
                 permission_mode: PermissionMode::DangerFullAccess,
             }
@@ -5843,6 +6016,7 @@ mod tests {
     fn parses_prompt_subcommand() {
         let _guard = env_lock();
         std::env::remove_var("RUSTY_CLAUDE_PERMISSION_MODE");
+        std::env::remove_var("CLAW_SYSTEM_PROMPT");
         let args = vec![
             "prompt".to_string(),
             "hello".to_string(),
@@ -5853,6 +6027,8 @@ mod tests {
             CliAction::Prompt {
                 prompt: "hello world".to_string(),
                 model: DEFAULT_MODEL.to_string(),
+                provider_selection: ProviderSelection::Auto,
+                system_prompt_text: None,
                 output_format: CliOutputFormat::Text,
                 allowed_tools: None,
                 permission_mode: PermissionMode::DangerFullAccess,
@@ -5864,6 +6040,7 @@ mod tests {
     fn parses_bare_prompt_and_json_output_flag() {
         let _guard = env_lock();
         std::env::remove_var("RUSTY_CLAUDE_PERMISSION_MODE");
+        std::env::remove_var("CLAW_SYSTEM_PROMPT");
         let args = vec![
             "--output-format=json".to_string(),
             "--model".to_string(),
@@ -5876,6 +6053,8 @@ mod tests {
             CliAction::Prompt {
                 prompt: "explain this".to_string(),
                 model: "claude-opus".to_string(),
+                provider_selection: ProviderSelection::Auto,
+                system_prompt_text: None,
                 output_format: CliOutputFormat::Json,
                 allowed_tools: None,
                 permission_mode: PermissionMode::DangerFullAccess,
@@ -5887,6 +6066,7 @@ mod tests {
     fn resolves_model_aliases_in_args() {
         let _guard = env_lock();
         std::env::remove_var("RUSTY_CLAUDE_PERMISSION_MODE");
+        std::env::remove_var("CLAW_SYSTEM_PROMPT");
         let args = vec![
             "--model".to_string(),
             "opus".to_string(),
@@ -5898,6 +6078,8 @@ mod tests {
             CliAction::Prompt {
                 prompt: "explain this".to_string(),
                 model: "claude-opus-4-6".to_string(),
+                provider_selection: ProviderSelection::Auto,
+                system_prompt_text: None,
                 output_format: CliOutputFormat::Text,
                 allowed_tools: None,
                 permission_mode: PermissionMode::DangerFullAccess,
@@ -5906,11 +6088,70 @@ mod tests {
     }
 
     #[test]
+    fn parses_explicit_openai_compatible_provider() {
+        let _guard = env_lock();
+        std::env::remove_var("RUSTY_CLAUDE_PERMISSION_MODE");
+        std::env::remove_var("CLAW_SYSTEM_PROMPT");
+        let args = vec![
+            "--provider".to_string(),
+            "openai-compatible".to_string(),
+            "--model".to_string(),
+            "local-qwen".to_string(),
+            "summarize".to_string(),
+            "this".to_string(),
+        ];
+        assert_eq!(
+            parse_args(&args).expect("args should parse"),
+            CliAction::Prompt {
+                prompt: "summarize this".to_string(),
+                model: "local-qwen".to_string(),
+                provider_selection: ProviderSelection::OpenAiCompatible,
+                system_prompt_text: None,
+                output_format: CliOutputFormat::Text,
+                allowed_tools: None,
+                permission_mode: PermissionMode::DangerFullAccess,
+            }
+        );
+    }
+
+    #[test]
+    fn openai_provider_uses_openai_model_env_by_default() {
+        let _guard = env_lock();
+        std::env::remove_var("RUSTY_CLAUDE_PERMISSION_MODE");
+        std::env::remove_var("CLAW_SYSTEM_PROMPT");
+        std::env::set_var("OPENAI_MODEL", "gpt-oss-120b");
+
+        let args = vec![
+            "--provider".to_string(),
+            "openai-compatible".to_string(),
+            "summarize".to_string(),
+            "this".to_string(),
+        ];
+        assert_eq!(
+            parse_args(&args).expect("args should parse"),
+            CliAction::Prompt {
+                prompt: "summarize this".to_string(),
+                model: "gpt-oss-120b".to_string(),
+                provider_selection: ProviderSelection::OpenAiCompatible,
+                system_prompt_text: None,
+                output_format: CliOutputFormat::Text,
+                allowed_tools: None,
+                permission_mode: PermissionMode::DangerFullAccess,
+            }
+        );
+
+        std::env::remove_var("OPENAI_MODEL");
+    }
+
+    #[test]
     fn resolves_known_model_aliases() {
         assert_eq!(resolve_model_alias("opus"), "claude-opus-4-6");
         assert_eq!(resolve_model_alias("sonnet"), "claude-sonnet-4-6");
         assert_eq!(resolve_model_alias("haiku"), "claude-haiku-4-5-20251213");
         assert_eq!(resolve_model_alias("claude-opus"), "claude-opus");
+        assert_eq!(resolve_model_alias("gemini"), "gemini-3-flash-preview");
+        assert_eq!(resolve_model_alias("deepseek"), "deepseek-chat");
+        assert_eq!(resolve_model_alias("perplexity"), "sonar-pro");
     }
 
     #[test]
@@ -5927,11 +6168,15 @@ mod tests {
 
     #[test]
     fn parses_permission_mode_flag() {
+        let _guard = env_lock();
+        std::env::remove_var("CLAW_SYSTEM_PROMPT");
         let args = vec!["--permission-mode=read-only".to_string()];
         assert_eq!(
             parse_args(&args).expect("args should parse"),
             CliAction::Repl {
                 model: DEFAULT_MODEL.to_string(),
+                provider_selection: ProviderSelection::Auto,
+                system_prompt_text: None,
                 allowed_tools: None,
                 permission_mode: PermissionMode::ReadOnly,
             }
@@ -5942,6 +6187,7 @@ mod tests {
     fn parses_allowed_tools_flags_with_aliases_and_lists() {
         let _guard = env_lock();
         std::env::remove_var("RUSTY_CLAUDE_PERMISSION_MODE");
+        std::env::remove_var("CLAW_SYSTEM_PROMPT");
         let args = vec![
             "--allowedTools".to_string(),
             "read,glob".to_string(),
@@ -5951,6 +6197,8 @@ mod tests {
             parse_args(&args).expect("args should parse"),
             CliAction::Repl {
                 model: DEFAULT_MODEL.to_string(),
+                provider_selection: ProviderSelection::Auto,
+                system_prompt_text: None,
                 allowed_tools: Some(
                     ["glob_search", "read_file", "write_file"]
                         .into_iter()
@@ -5971,6 +6219,8 @@ mod tests {
 
     #[test]
     fn parses_system_prompt_options() {
+        let _guard = env_lock();
+        std::env::remove_var("CLAW_SYSTEM_PROMPT");
         let args = vec![
             "system-prompt".to_string(),
             "--cwd".to_string(),
@@ -5983,6 +6233,30 @@ mod tests {
             CliAction::PrintSystemPrompt {
                 cwd: PathBuf::from("/tmp/project"),
                 date: "2026-04-01".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn parses_custom_system_prompt_text_flag() {
+        let _guard = env_lock();
+        std::env::remove_var("CLAW_SYSTEM_PROMPT");
+        let args = vec![
+            "--system-prompt-text".to_string(),
+            "Be precise and concise.".to_string(),
+            "prompt".to_string(),
+            "hello".to_string(),
+        ];
+        assert_eq!(
+            parse_args(&args).expect("args should parse"),
+            CliAction::Prompt {
+                prompt: "hello".to_string(),
+                model: DEFAULT_MODEL.to_string(),
+                provider_selection: ProviderSelection::Auto,
+                system_prompt_text: Some("Be precise and concise.".to_string()),
+                output_format: CliOutputFormat::Text,
+                allowed_tools: None,
+                permission_mode: PermissionMode::DangerFullAccess,
             }
         );
     }
@@ -6026,6 +6300,7 @@ mod tests {
     fn parses_single_word_command_aliases_without_falling_back_to_prompt_mode() {
         let _guard = env_lock();
         std::env::remove_var("RUSTY_CLAUDE_PERMISSION_MODE");
+        std::env::remove_var("CLAW_SYSTEM_PROMPT");
         assert_eq!(
             parse_args(&["help".to_string()]).expect("help should parse"),
             CliAction::Help
@@ -6058,12 +6333,15 @@ mod tests {
     fn multi_word_prompt_still_uses_shorthand_prompt_mode() {
         let _guard = env_lock();
         std::env::remove_var("RUSTY_CLAUDE_PERMISSION_MODE");
+        std::env::remove_var("CLAW_SYSTEM_PROMPT");
         assert_eq!(
             parse_args(&["help".to_string(), "me".to_string(), "debug".to_string()])
                 .expect("prompt shorthand should still work"),
             CliAction::Prompt {
                 prompt: "help me debug".to_string(),
                 model: DEFAULT_MODEL.to_string(),
+                provider_selection: ProviderSelection::Auto,
+                system_prompt_text: None,
                 output_format: CliOutputFormat::Text,
                 allowed_tools: None,
                 permission_mode: PermissionMode::DangerFullAccess,
@@ -6340,13 +6618,15 @@ mod tests {
     fn startup_banner_mentions_workflow_completions() {
         let _guard = env_lock();
         // Inject dummy credentials so LiveCli can construct without real Anthropic key
-        std::env::set_var("ANTHROPIC_API_KEY", "test-dummy-key-for-banner-test");
+        std::env::set_var("ANTHROPIC_API_KEY", "test-anthropic-key-for-banner-test");
         let root = temp_dir();
         fs::create_dir_all(&root).expect("root dir");
 
         let banner = with_current_dir(&root, || {
             LiveCli::new(
                 "claude-sonnet-4-6".to_string(),
+                ProviderSelection::Auto,
+                None,
                 true,
                 None,
                 PermissionMode::DangerFullAccess,
@@ -7521,7 +7801,10 @@ UU conflicted.rs",
         let config_home = temp_dir();
         // Inject a dummy API key so runtime construction succeeds without real credentials.
         // This test only exercises plugin lifecycle (init/shutdown), never calls the API.
-        std::env::set_var("ANTHROPIC_API_KEY", "test-dummy-key-for-plugin-lifecycle");
+        std::env::set_var(
+            "ANTHROPIC_API_KEY",
+            "test-anthropic-key-for-plugin-lifecycle",
+        );
         let workspace = temp_dir();
         let source_root = temp_dir();
         fs::create_dir_all(&config_home).expect("config home");
@@ -7543,6 +7826,7 @@ UU conflicted.rs",
             Session::new(),
             "runtime-plugin-lifecycle",
             DEFAULT_MODEL.to_string(),
+            ProviderSelection::Auto,
             vec!["test system prompt".to_string()],
             true,
             false,

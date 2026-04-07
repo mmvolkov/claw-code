@@ -10,6 +10,7 @@ mod bootstrap;
 mod compact;
 mod config;
 mod conversation;
+mod env_file;
 mod file_ops;
 pub mod green_contract;
 mod hooks;
@@ -61,6 +62,7 @@ pub use conversation::{
     ConversationRuntime, PromptCacheEvent, RuntimeError, StaticToolExecutor, ToolError,
     ToolExecutor, TurnSummary,
 };
+pub use env_file::{load_dotenv_for, load_dotenv_upwards};
 pub use file_ops::{
     edit_file, glob_search, grep_search, read_file, write_file, EditFileOutput, GlobSearchOutput,
     GrepSearchInput, GrepSearchOutput, ReadFileOutput, StructuredPatchHunk, TextFilePayload,

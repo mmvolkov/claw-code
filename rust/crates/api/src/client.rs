@@ -2,7 +2,7 @@ use crate::error::ApiError;
 use crate::prompt_cache::{PromptCache, PromptCacheRecord, PromptCacheStats};
 use crate::providers::anthropic::{self, AnthropicClient, AuthSource};
 use crate::providers::openai_compat::{self, OpenAiCompatClient, OpenAiCompatConfig};
-use crate::providers::{self, ProviderKind};
+use crate::providers::{self, ProviderKind, ProviderSelection};
 use crate::types::{MessageRequest, MessageResponse, StreamEvent};
 
 #[allow(clippy::large_enum_variant)]
@@ -11,21 +11,32 @@ pub enum ProviderClient {
     Anthropic(AnthropicClient),
     Xai(OpenAiCompatClient),
     OpenAi(OpenAiCompatClient),
+    Gemini(OpenAiCompatClient),
+    DeepSeek(OpenAiCompatClient),
+    Perplexity(OpenAiCompatClient),
 }
 
 impl ProviderClient {
     pub fn from_model(model: &str) -> Result<Self, ApiError> {
-        Self::from_model_with_anthropic_auth(model, None)
+        Self::from_model_with_selection(model, ProviderSelection::Auto, None)
     }
 
     pub fn from_model_with_anthropic_auth(
         model: &str,
         anthropic_auth: Option<AuthSource>,
     ) -> Result<Self, ApiError> {
+        Self::from_model_with_selection(model, ProviderSelection::Auto, anthropic_auth)
+    }
+
+    pub fn from_model_with_selection(
+        model: &str,
+        selection: ProviderSelection,
+        anthropic_auth: Option<AuthSource>,
+    ) -> Result<Self, ApiError> {
         let resolved_model = providers::resolve_model_alias(model);
-        match providers::detect_provider_kind(&resolved_model) {
+        match selection.resolve_kind(&resolved_model) {
             ProviderKind::Anthropic => Ok(Self::Anthropic(match anthropic_auth {
-                Some(auth) => AnthropicClient::from_auth(auth),
+                Some(auth) => AnthropicClient::from_auth(auth).with_base_url(read_base_url()),
                 None => AnthropicClient::from_env()?,
             })),
             ProviderKind::Xai => Ok(Self::Xai(OpenAiCompatClient::from_env(
@@ -33,6 +44,15 @@ impl ProviderClient {
             )?)),
             ProviderKind::OpenAi => Ok(Self::OpenAi(OpenAiCompatClient::from_env(
                 OpenAiCompatConfig::openai(),
+            )?)),
+            ProviderKind::Gemini => Ok(Self::Gemini(OpenAiCompatClient::from_env(
+                OpenAiCompatConfig::gemini(),
+            )?)),
+            ProviderKind::DeepSeek => Ok(Self::DeepSeek(OpenAiCompatClient::from_env(
+                OpenAiCompatConfig::deepseek(),
+            )?)),
+            ProviderKind::Perplexity => Ok(Self::Perplexity(OpenAiCompatClient::from_env(
+                OpenAiCompatConfig::perplexity(),
             )?)),
         }
     }
@@ -43,6 +63,9 @@ impl ProviderClient {
             Self::Anthropic(_) => ProviderKind::Anthropic,
             Self::Xai(_) => ProviderKind::Xai,
             Self::OpenAi(_) => ProviderKind::OpenAi,
+            Self::Gemini(_) => ProviderKind::Gemini,
+            Self::DeepSeek(_) => ProviderKind::DeepSeek,
+            Self::Perplexity(_) => ProviderKind::Perplexity,
         }
     }
 
@@ -58,7 +81,11 @@ impl ProviderClient {
     pub fn prompt_cache_stats(&self) -> Option<PromptCacheStats> {
         match self {
             Self::Anthropic(client) => client.prompt_cache_stats(),
-            Self::Xai(_) | Self::OpenAi(_) => None,
+            Self::Xai(_)
+            | Self::OpenAi(_)
+            | Self::Gemini(_)
+            | Self::DeepSeek(_)
+            | Self::Perplexity(_) => None,
         }
     }
 
@@ -66,7 +93,11 @@ impl ProviderClient {
     pub fn take_last_prompt_cache_record(&self) -> Option<PromptCacheRecord> {
         match self {
             Self::Anthropic(client) => client.take_last_prompt_cache_record(),
-            Self::Xai(_) | Self::OpenAi(_) => None,
+            Self::Xai(_)
+            | Self::OpenAi(_)
+            | Self::Gemini(_)
+            | Self::DeepSeek(_)
+            | Self::Perplexity(_) => None,
         }
     }
 
@@ -76,7 +107,11 @@ impl ProviderClient {
     ) -> Result<MessageResponse, ApiError> {
         match self {
             Self::Anthropic(client) => client.send_message(request).await,
-            Self::Xai(client) | Self::OpenAi(client) => client.send_message(request).await,
+            Self::Xai(client)
+            | Self::OpenAi(client)
+            | Self::Gemini(client)
+            | Self::DeepSeek(client)
+            | Self::Perplexity(client) => client.send_message(request).await,
         }
     }
 
@@ -89,7 +124,11 @@ impl ProviderClient {
                 .stream_message(request)
                 .await
                 .map(MessageStream::Anthropic),
-            Self::Xai(client) | Self::OpenAi(client) => client
+            Self::Xai(client)
+            | Self::OpenAi(client)
+            | Self::Gemini(client)
+            | Self::DeepSeek(client)
+            | Self::Perplexity(client) => client
                 .stream_message(request)
                 .await
                 .map(MessageStream::OpenAiCompat),
@@ -133,9 +172,31 @@ pub fn read_xai_base_url() -> String {
     openai_compat::read_base_url(OpenAiCompatConfig::xai())
 }
 
+#[must_use]
+pub fn read_openai_base_url() -> String {
+    openai_compat::read_base_url(OpenAiCompatConfig::openai())
+}
+
+#[must_use]
+pub fn read_gemini_base_url() -> String {
+    openai_compat::read_base_url(OpenAiCompatConfig::gemini())
+}
+
+#[must_use]
+pub fn read_deepseek_base_url() -> String {
+    openai_compat::read_base_url(OpenAiCompatConfig::deepseek())
+}
+
+#[must_use]
+pub fn read_perplexity_base_url() -> String {
+    openai_compat::read_base_url(OpenAiCompatConfig::perplexity())
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::providers::{detect_provider_kind, resolve_model_alias, ProviderKind};
+    use crate::providers::{
+        detect_provider_kind, resolve_model_alias, ProviderKind, ProviderSelection,
+    };
 
     #[test]
     fn resolves_existing_and_grok_aliases() {
@@ -149,6 +210,18 @@ mod tests {
         assert_eq!(detect_provider_kind("grok-3"), ProviderKind::Xai);
         assert_eq!(
             detect_provider_kind("claude-sonnet-4-6"),
+            ProviderKind::Anthropic
+        );
+    }
+
+    #[test]
+    fn explicit_provider_selection_overrides_auto_detection() {
+        assert_eq!(
+            ProviderSelection::OpenAiCompatible.resolve_kind("custom-local-model"),
+            ProviderKind::OpenAi
+        );
+        assert_eq!(
+            ProviderSelection::Anthropic.resolve_kind("grok-3"),
             ProviderKind::Anthropic
         );
     }
