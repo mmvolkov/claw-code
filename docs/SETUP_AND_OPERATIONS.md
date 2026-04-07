@@ -71,6 +71,8 @@ cd "$(git rev-parse --show-toplevel)/rust"
 
 ## Установка и запуск через Docker
 
+Сжатая самодостаточная инструкция только для Docker: [DOCKER.md](./DOCKER.md).
+
 В репозитории есть верхнеуровневый [Dockerfile](../Dockerfile). Образ включает:
 
 - инструментарий Rust
@@ -117,11 +119,14 @@ docker run --rm -it \
 
 ### Запуск web UI в Docker
 
+Если контейнер **`claw-web`** уже существует, сначала выполните `docker rm -f claw-web`, иначе будет ошибка конфликта имени. В сценарии ниже перед `docker run` добавлена безопасная очистка (`2>/dev/null || true` скрывает сообщение, если контейнера ещё не было).
+
 ```bash
 cd "$(git rev-parse --show-toplevel)"
 read -s ANTHROPIC_API_KEY
 echo
 mkdir -p "$HOME/.claw-docker"
+docker rm -f claw-web 2>/dev/null || true
 
 docker run --rm -it \
   --name claw-web \

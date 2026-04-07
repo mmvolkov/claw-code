@@ -41,6 +41,8 @@ cargo build --workspace
 
 ## Запуск через Docker
 
+Полная пошаговая инструкция для работы только в Docker: [docs/DOCKER.md](./docs/DOCKER.md).
+
 В репозитории есть верхнеуровневый `Dockerfile`, позволяющий запускать `claw` в контейнеризированной dev-среде.
 
 Соберите образ из корня репозитория:
@@ -102,7 +104,7 @@ docker run --rm -it \
 
 Web-интерфейс стримит дельты ответа ассистента, активность инструментов, обновления usage и финальное завершение turn через SSE endpoint `/api/chat/stream`.
 
-Для локальной OpenAI-compatible модели выберите в web UI `Provider = openai-compatible`, укажите model id вашей модели и передайте `OPENAI_API_KEY` плюс при необходимости `OPENAI_BASE_URL`.
+Для локальной OpenAI-compatible модели в Web UI: см. пошагово [docs/DOCKER.md](./docs/DOCKER.md) (раздел «Локальная OpenAI-compatible модель в Web UI»): поля **Provider** / **Model**, переменные `OPENAI_*`, примеры `.env` и `docker run -e`.
 
 Если вы хотите использовать браузерный Claude OAuth из web UI, не передавайте в контейнер `ANTHROPIC_API_KEY` и `ANTHROPIC_AUTH_TOKEN`, потому что переменные окружения имеют приоритет над сохраненными OAuth-токенами.  
 Claw Web завершает OAuth через тот же loopback callback, что и `claw login`: `http://localhost:4545/callback`.  

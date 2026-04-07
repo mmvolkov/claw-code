@@ -31,7 +31,7 @@
 </p>
 
 > [!IMPORTANT]
-> Активный Rust workspace теперь находится в [`rust/`](./rust). Начните с [`USAGE.md`](./USAGE.md), если нужны быстрые команды, затем откройте [`docs/SETUP_AND_OPERATIONS.md`](./docs/SETUP_AND_OPERATIONS.md) для полного runbook по установке и эксплуатации, а [`rust/README.md`](./rust/README.md) используйте для деталей по crate’ам.
+> Активный Rust workspace теперь находится в [`rust/`](./rust). Начните с [`USAGE.md`](./USAGE.md), если нужны быстрые команды, затем откройте [`docs/SETUP_AND_OPERATIONS.md`](./docs/SETUP_AND_OPERATIONS.md) для полного runbook по установке и эксплуатации. Запуск в Docker — [`docs/DOCKER.md`](./docs/DOCKER.md). Детали по crate’ам — [`rust/README.md`](./rust/README.md).
 
 > Нужна более широкая идея, стоящая за этим репозиторием? Прочитайте [`PHILOSOPHY.md`](./PHILOSOPHY.md) и публичное объяснение Сигрид Джин: https://x.com/realsigridjin/status/2039472968624185713
 
